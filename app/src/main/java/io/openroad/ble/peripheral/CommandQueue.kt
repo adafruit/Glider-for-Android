@@ -1,4 +1,4 @@
-package io.openroad.ble.device
+package io.openroad.ble.peripheral
 
 /**
  * Created by Antonio García (antonio@openroad.es)

@@ -10,6 +10,7 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import io.openroad.ble.BleScanException
 import io.openroad.ble.getBluetoothAdapter
 import io.openroad.ble.isBleStateAndPermissionsReady
 import io.openroad.utils.LogUtils
@@ -24,7 +25,7 @@ import kotlinx.coroutines.flow.flowOn
 
 // Config
 // -    Batch scan results and deliver them after kScanPortDelay milliseconds. Warning: setting a delay bigger than 0 will not be taken into account on some devices and an internal delay of several seconds is used
-private const val kScanReportDelay = 500L
+private const val kScanReportDelay = 0L//500L
 
 /*
        Bluetooth scanner
@@ -36,9 +37,6 @@ class BleAdvertisementScanner(
     scanMode: Int = ScanSettings.SCAN_MODE_LOW_LATENCY,
     matchMode: Int = ScanSettings.MATCH_MODE_STICKY
 ) {
-    data class ScanException(
-        val errorCode: Int,
-    ) : Exception("Scan Exception")
 
     private val scanner = getBluetoothAdapter(context)?.bluetoothLeScanner
     private val log by LogUtils()
@@ -55,6 +53,11 @@ class BleAdvertisementScanner(
                     super.onBatchScanResults(results)
 
                     if (results == null) return
+                    /*
+                    results.forEach {
+                        log.info("result: ${it.scanRecord?.deviceName}")
+                    }*/
+
                     trySend(results)
                         .onFailure {
                             log.warning("scanResultFlow failure for batch result with ${results.size} items")
@@ -67,14 +70,14 @@ class BleAdvertisementScanner(
                     if (result == null) return
                     trySend(arrayListOf(result))
                         .onFailure {
-                            log.warning("scanResultFlow failure for result: ${result.scanRecord?.deviceName}")
+                            log.warning("scanResultFlow failure for result: ${result.scanRecord?.deviceName ?: result.device.address}")
                         }
                 }
 
                 override fun onScanFailed(errorCode: Int) {
                     super.onScanFailed(errorCode)
                     log.severe("scanResultFlow failed: $errorCode")
-                    cancel("scanResultFlow failed", ScanException(errorCode))
+                    cancel("scanResultFlow failed", BleScanException(errorCode))
                 }
             }
 

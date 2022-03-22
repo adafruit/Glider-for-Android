@@ -7,7 +7,9 @@ package io.openroad.ble.scanner
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.content.Context
-import io.openroad.ble.device.BlePeripheral
+import io.openroad.ble.BleException
+import io.openroad.ble.BleScanException
+import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -36,11 +38,12 @@ class BlePeripheralScanner(
 
     private val blePeripherals = mutableListOf<BlePeripheral>()     // Cached list of devices
     private val _blePeripheralsState = MutableStateFlow<List<BlePeripheral>>(emptyList())
-    private val _bleErrorState = MutableStateFlow<Int?>(null)
+
+    private val _bleErrorException = MutableStateFlow<BleException?>(null)
 
     // Data
     val blePeripheralsState = _blePeripheralsState.asStateFlow()
-    val bleErrorState = _bleErrorState.asStateFlow()
+    val bleErrorException = _bleErrorException.asStateFlow()
     val isRunning: Boolean; get() = scanJob != null
 
     // region Actions
@@ -51,7 +54,7 @@ class BlePeripheralScanner(
         log.info("Start BlePeripheralScanner")
 
         // Collect each advertising found and update a list of known blePeripheral and a blePeripheralsState StateFlow
-        _bleErrorState.update { null }
+        _bleErrorException.update { null }
         scanJob?.cancel()
         scanJob = bleAdvertisementScanner.scanResultFlow
             .onEach { scanResultList ->
@@ -78,9 +81,9 @@ class BlePeripheralScanner(
                 }
 
                 val cause = exception?.cause
-                if (cause is BleAdvertisementScanner.ScanException) {
+                if (cause is BleScanException) {
                     log.severe("scanResultFlow finished: failed")
-                    _bleErrorState.update { cause.errorCode }
+                    _bleErrorException.update { cause }
                 } else {
                     log.info("scanResultFlow finished: done")
                 }

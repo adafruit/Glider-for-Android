@@ -1,4 +1,4 @@
-package io.openroad.ble.device
+package io.openroad.ble.peripheral
 
 /**
  * Created by Antonio García (antonio@openroad.es)
@@ -7,13 +7,14 @@ package io.openroad.ble.device
 import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.ScanResult
-import android.content.Context
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import androidx.annotation.MainThread
 import com.adafruit.glider.BuildConfig
-import io.openroad.ble.cancelDiscovery
-import io.openroad.ble.refreshDeviceCache
+import io.openroad.ble.*
+import io.openroad.ble.filetransfer.BleFileTransferPeripheral
+import io.openroad.ble.state.BleState
 import io.openroad.ble.utils.toHexString
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,21 +25,23 @@ import java.util.*
 
 // Constants
 private const val kDefaultMtuSize = 20
-private val kClientCharacteristicConfigUUID =
+internal val kClientCharacteristicConfigUUID =
     UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
 // Configuration
 // -    Sets a identifier for each command and verifies that the command processed is the one expected
 private val kDebugCommands = BuildConfig.DEBUG && true
 
-// -    Debugs timeouts from commands
+// -    Debug timeouts from commands
 private val kProfileTimeouts = BuildConfig.DEBUG && true
 
 //
-open class BlePeripheral(var scanResult: ScanResult) {
+open class BlePeripheral(
+    scanResult: ScanResult
+) {
     companion object {
         // Global Parameter that affects all rssi measurements. 1 means don't use a running average. The closer to 0 the more resistant the value it is to change
-        const val rssiRunningAverageFactor = 1.0
+        // const val rssiRunningAverageFactor = 1.0
 
         // Note: Value should be different that errors defined in BluetoothGatt.GATT_*
         const val kPeripheralReadTimeoutError = -1
@@ -55,36 +58,57 @@ open class BlePeripheral(var scanResult: ScanResult) {
     private var cachedAddress: String? = null   // Cached address
 
     // Data - State
-    enum class State {
-        Unknown,
-        Disconnected,
-        Connecting,
-        Connected,
-        Disconnecting;
+    sealed class ConnectionState {
+        object Connecting : ConnectionState()
+        object Connected : ConnectionState()
+        data class Disconnecting(val cause: Throwable? = null) : ConnectionState()
+        data class Disconnected(val cause: Throwable? = null) : ConnectionState()
 
         companion object {
-            fun from(bluetoothProfileState: Int): State {
+            fun from(bluetoothProfileState: Int): ConnectionState {
                 return when (bluetoothProfileState) {
-                    BluetoothProfile.STATE_DISCONNECTED -> Disconnected
+                    BluetoothProfile.STATE_DISCONNECTED -> Disconnected()
                     BluetoothProfile.STATE_CONNECTING -> Connecting
                     BluetoothProfile.STATE_CONNECTED -> Connected
-                    BluetoothProfile.STATE_DISCONNECTING -> Disconnecting
+                    BluetoothProfile.STATE_DISCONNECTING -> Disconnecting()
                     else -> {
-                        Unknown
+                        // Unknown state returned by Android. Set is as disconnected
+                        Disconnected(cause = BleUnknownStateException())
                     }
                 }
             }
         }
     }
 
-    private val _connectionState = MutableStateFlow(State.Disconnected)
+
+    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected())
     val connectionState = _connectionState.asStateFlow()
+
+
+    fun confirmConnectionState(requiredConnectionState: ConnectionState) =
+        connectionState.value == requiredConnectionState
+
+    fun confirmConnectionStateOrThrow(requiredConnectionState: ConnectionState) {
+        if (!confirmConnectionState(requiredConnectionState)) {
+            throw BleInvalidStateException()
+        }
+    }
 
     // Data - Advertising
     val createdMillis =
         System.currentTimeMillis()          // Time when it was created (usually the time when the advertising was discovered)
     var lastUpdateMillis = System.currentTimeMillis(); private set
 
+    private val _rssi: MutableStateFlow<Int> = MutableStateFlow(scanResult.rssi)
+    val rssi = _rssi.asStateFlow()
+
+    val currentRssi = rssi.value
+
+    // Data - Connection
+    private val bluetoothDevice: BluetoothDevice = scanResult.device
+    private var connectionHandlerThread: HandlerThread? = null
+
+/*
     var rssi: Int?                          // Latest rssi read (initial value from scanResult, but can be updated when remote reading rssi)
         get() {
             return _runningRssi
@@ -97,15 +121,19 @@ open class BlePeripheral(var scanResult: ScanResult) {
             } else {
                 (rssiRunningAverageFactor * newValue + (1 - rssiRunningAverageFactor) * oldRunningRssi).toInt()
             }
-        }
+        }*/
 
     // Data - ScanRecord Data
+    private val _scanResult: MutableStateFlow<ScanResult> = MutableStateFlow(scanResult)
+    val scanResult = _scanResult.asStateFlow()
+
+    // TODO: encapsulate advertising data in separate class
     val scanRecord = scanResult.scanRecord
 
     val address: String
         get() {
             if (cachedAddress == null) {
-                cachedAddress = scanResult.device.address
+                cachedAddress = scanResult.value.device.address
             }
             return cachedAddress!!
         }
@@ -125,7 +153,7 @@ open class BlePeripheral(var scanResult: ScanResult) {
         get() {
             var result: String? = null
             try {
-                result = scanResult.device.name
+                result = scanResult.value.device.name
             } catch (e: SecurityException) {
                 log.severe("Security exception accessing remote name: $e")
             }
@@ -133,6 +161,15 @@ open class BlePeripheral(var scanResult: ScanResult) {
             return result
         }
 
+    // region Scanning
+    fun updateScanResult(scanResult: ScanResult) {
+        lastUpdateMillis = System.currentTimeMillis()
+        _scanResult.update { scanResult }
+        _rssi.update { scanResult.rssi }     // Update rssi from scanResult
+        cachedNameNeedsUpdate = true
+    }
+
+    // endregion
 
     // Data - Private - Connection
     private var bluetoothGatt: BluetoothGatt? = null
@@ -140,7 +177,6 @@ open class BlePeripheral(var scanResult: ScanResult) {
 
     // Data - Private - Reconnection
     private var reconnectionAttempts = 0
-    private var reconnectionContext: Context? = null
 
     // Data - Private - Reconnection
     private val notifyHandlers = HashMap<String, NotifyHandler>()
@@ -149,79 +185,95 @@ open class BlePeripheral(var scanResult: ScanResult) {
 
     // region Lifecycle
     init {
-        // Initial rssi from advertising
-        rssi = scanResult.rssi
     }
-    // endregion
-
-    // region Scanning
-
-    fun updateScanResult(scanResult: ScanResult) {
-        this.scanResult = scanResult
-        rssi = scanResult.rssi      // Update rssi from scanResult
-        lastUpdateMillis = System.currentTimeMillis()
-        cachedNameNeedsUpdate = true
-    }
-
     // endregion
 
     // region Connection
-    /*
-          Note: to avoid problems with some phones connecting it is recommended to wait for 0.5seconds before calling connect after stop scanning
-     */
+
+
+    // TODO: convert connection and gattCallback to use Kotlin flows
     @SuppressLint("MissingPermission")
     @MainThread
-    fun connect(context: Context) {
+    fun connect() {
+        // Confirm that ble state is enabled
+        if (!confirmBleState(requiredState = BleState.Enabled)) {
+            _connectionState.update { ConnectionState.Disconnected(BleInvalidStateException()) }
+            return
+        }
+
+        // Confirm that is disconnected before starting connection (because it can already be connected)
+        if (!confirmConnectionState(requiredConnectionState = ConnectionState.Disconnected())) {
+            _connectionState.update { ConnectionState.Disconnected(BleConnectionInvalidStateException()) }
+            return
+        }
+
+        // Setup connection handler
+        val thread = HandlerThread("BlePeripheral_${nameOrAddress}").apply { start() }
+        val handler = Handler(thread.looper)
+        connectionHandlerThread = thread
+
+        val context = applicationContext
+
+        // Start connection attempts
         reconnectionAttempts = 0
         commandQueue.clear()
-        _connectionState.update { State.Connecting }
+        _connectionState.update { ConnectionState.Connecting }
         cancelDiscovery(context)    // Note: always cancel discovery before connecting
 
-        reconnectionContext = context
-
-        bluetoothGatt = scanResult.device.connectGatt(
+        bluetoothGatt = bluetoothDevice.connectGatt(
             context,
             false,
             gattCallback,
-            BluetoothDevice.TRANSPORT_LE
+            BluetoothDevice.TRANSPORT_LE,
+            BluetoothDevice.PHY_LE_1M_MASK,
+            handler
         )
+
         if (bluetoothGatt == null) {
             log.severe("connectGatt Error. Returns null")
+            cancelConnectionHandlerThread()
+            throw BleException("connectGatt returns null")
         }
+
+        // Wait for connection status in gattCallback
+    }
+
+    private fun cancelConnectionHandlerThread() {
+        connectionHandlerThread?.quit()
+        connectionHandlerThread = null
     }
 
     @SuppressLint("MissingPermission")
     @MainThread
-    fun disconnect() {
+    fun disconnect(cause: Throwable? = null) {
         if (bluetoothGatt != null) {
-            val oldState = _connectionState.getAndUpdate { State.Disconnecting }
+            val oldState = _connectionState.getAndUpdate { ConnectionState.Disconnecting(cause) }
             bluetoothGatt?.disconnect()
-            val wasConnecting = oldState == State.Connecting
-            if (wasConnecting) {        // Force a disconnect broadcast because it will not be generated by the OS
-                connectionFinished(true)
+            val wasConnecting = oldState == ConnectionState.Connecting
+            if (wasConnecting) {        // Force a disconnect status change because onDisconnect is not generated by Android
+                connectionFinished()
             }
         } else {
             log.warning("Disconnect called with null bluetoothGatt")
         }
     }
 
-    private fun connectionFinished(isExpected: Boolean) {
-        _connectionState.update { State.Disconnected }
+    private fun connectionFinished(cause: Throwable? = null) {
+        _connectionState.update { previousState ->
+            // Set the state to disconnected, but if no cause is supplied and there was a cause when disconnecting, use that one
+            val disconnectingCause = (previousState as? ConnectionState.Disconnecting)?.cause
+            if (cause == null && disconnectingCause != null) {
+                ConnectionState.Disconnected(disconnectingCause)
+            } else {
+                ConnectionState.Disconnected(cause)
+            }
+        }
+        cancelConnectionHandlerThread()
         closeBluetoothGatt()
-        reconnectionContext = null
-    }
-
-    fun isDisconnectedOrDisconnecting(): Boolean {
-        return _connectionState.value == State.Disconnecting || isDisconnected()
-    }
-
-    fun isDisconnected(): Boolean {
-        return _connectionState.value == State.Disconnected
     }
     // endregion
 
     // region Phy
-
     @SuppressLint("MissingPermission")
     fun setPreferredPhy(txPhy: Int, rxPhy: Int, phyOptions: Int) {
         bluetoothGatt?.setPreferredPhy(txPhy, rxPhy, phyOptions)
@@ -266,7 +318,6 @@ open class BlePeripheral(var scanResult: ScanResult) {
         // If multiple instance of the service exist, it returns the first one
         return bluetoothGatt?.getService(uuid)
     }
-
     // endregion
 
     // region Characteristics
@@ -528,9 +579,7 @@ open class BlePeripheral(var scanResult: ScanResult) {
             }
         commandQueue.add(command)
     }
-
     // endregion
-
 
     // region BluetoothGattCallback
     private val gattCallback = object : BluetoothGattCallback() {
@@ -538,18 +587,17 @@ open class BlePeripheral(var scanResult: ScanResult) {
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
 
+
             Handler(Looper.getMainLooper()).post {          // Not needed ??
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     when (newState) {
                         BluetoothProfile.STATE_CONNECTED -> {
                             log.info("Connection state changed: CONNECTED")
-                            _connectionState.update { State.Connected }
-                            reconnectionContext = null
+                            _connectionState.update { ConnectionState.Connected }
                         }
                         BluetoothProfile.STATE_DISCONNECTED -> {
                             log.info("Connection state changed: DISCONNECTED")
-                            reconnectionContext = null
-                            connectionFinished(true)
+                            connectionFinished()
                         }
                         else -> {
                             log.info("Connection state changed to: $newState (status: $status)")
@@ -557,7 +605,7 @@ open class BlePeripheral(var scanResult: ScanResult) {
                     }
                 } else {      // Error
                     log.info("Connection status error $status")
-                    if (status == 133 && newState == BluetoothProfile.STATE_DISCONNECTED && reconnectionAttempts < 2 && reconnectionContext != null) {     // Error. Try to connect again https://medium.com/@martijn.van.welie/making-android-ble-work-part-2-47a3cdaade07
+                    if (status == 133 && newState == BluetoothProfile.STATE_DISCONNECTED && reconnectionAttempts < 2) {     // Error. Try to connect again https://medium.com/@martijn.van.welie/making-android-ble-work-part-2-47a3cdaade07
                         reconnectionAttempts++
                         log.info("Connection error. Trying to reconnect... (Attempt $reconnectionAttempts)")
 
@@ -566,15 +614,26 @@ open class BlePeripheral(var scanResult: ScanResult) {
                         }
 
                         (bluetoothGatt ?: gatt).close()
+
+                        // Setup connection handler
+                        connectionHandlerThread?.quit()
+                        val thread =
+                            HandlerThread("BlePeripheral_${nameOrAddress}").apply { start() }
+                        val handler = Handler(thread.looper)
+                        connectionHandlerThread = thread
+
+                        // Connect
                         bluetoothGatt =
                             scanResult.device.connectGatt(
-                                reconnectionContext,
+                                applicationContext,
                                 reconnectionAttempts == 2,      // Autoconnect true looks like can solve the problem but it will never timeout
                                 this,
-                                BluetoothDevice.TRANSPORT_LE
+                                BluetoothDevice.TRANSPORT_LE,
+                                BluetoothDevice.PHY_LE_1M_MASK,
+                                handler
                             )
                     } else {
-                        connectionFinished(false)
+                        connectionFinished(BleConnectionException(status))
                     }
                 }
             }
@@ -754,7 +813,6 @@ open class BlePeripheral(var scanResult: ScanResult) {
         }
     }
 
-
     // region Utils
     @SuppressLint("MissingPermission")
     @MainThread
@@ -791,7 +849,6 @@ open class BlePeripheral(var scanResult: ScanResult) {
     ): String {
         return serviceUUID.toString() + characteristicUUID.toString() + descriptorUUID.toString()
     }
-
     // endregion
 
     // region CaptureReadHandler

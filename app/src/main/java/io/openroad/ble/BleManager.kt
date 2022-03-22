@@ -66,7 +66,7 @@ fun getNeededPermissions(): List<String> {
 // endregion
 
 // region Static BleState
-fun getBleState(context: Context): BleState {
+fun getBleState(context: Context = applicationContext): BleState {
     val adapter = getBluetoothAdapter(context)
         ?: return BleState.BluetoothNotAvailable
 
@@ -77,6 +77,17 @@ fun getBleState(context: Context): BleState {
 
     return BleState.from(adapter.state)
 }
+
+fun confirmBleState(context: Context = applicationContext, requiredState: BleState): Boolean {
+    return getBleState(context) == requiredState
+}
+
+fun confirmBleStateOrThrow(context: Context = applicationContext, requiredState: BleState) {
+    if (!confirmBleState(context, requiredState)) {
+        throw BleInvalidStateException()
+    }
+}
+
 // endregion
 
 // region Utils

@@ -27,6 +27,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adafruit.glider.BuildConfig
 import com.adafruit.glider.R
 import com.adafruit.glider.ui.BackgroundGradientDefault
 import com.adafruit.glider.ui.theme.GliderTheme
@@ -74,33 +75,42 @@ private fun ScanBody(
 
     // Scan vars
     //val isScanning = uiState == ScanViewModel.ScanUiState.Scanning
-    val numDevicesFound by viewModel.numDevicesFound.collectAsState(0)
-    val numMatchingDevicesInRangeFound by viewModel.numMatchingDevicesInRangeFound.collectAsState(0)
-    val numMatchingDevicesOutOfRangeFound by viewModel.numMatchingDevicesOutOfRangeFound.collectAsState(
+    val numDevicesFound by viewModel.numPeripheralsFound.collectAsState(0)
+    val numMatchingDevicesInRangeFound by viewModel.numMatchingPeripheralsInRangeFound.collectAsState(
+        0
+    )
+    val numMatchingDevicesOutOfRangeFound by viewModel.numMatchingPeripheralsOutOfRangeFound.collectAsState(
         0
     )
 
-    // Show error snackbar if needed
-    val bleError by viewModel.bleError.collectAsState()
-    if (bleError != null) {
-        LaunchedEffect(bleError) {
-            snackbarHostState.showSnackbar(message = "Scan error: $bleError")
+    // Show snackbar if state is ScanningError
+    if (uiState is ScanViewModel.ScanUiState.ScanningError) {
+        val cause = (uiState as ScanViewModel.ScanUiState.ScanningError).cause
+        LaunchedEffect(cause) {
+            snackbarHostState.showSnackbar(message = "Scan error: $cause")
         }
     }
 
     // UI
     Column(
-        modifier = Modifier.padding(innerPadding),
+        modifier = Modifier
+            .padding(innerPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Waves(Modifier.padding(top = 40.dp))
+        Waves(
+            Modifier
+                .weight(1f)
+                .requiredWidthIn(max = 400.dp)
+                .padding(top = 20.dp)
+        )
 
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text("Found: $numDevicesFound devices")
-            Text("Matching: $numMatchingDevicesInRangeFound devices")
 
             // Status
             Crossfade(targetState = uiState) { state ->
@@ -109,6 +119,7 @@ private fun ScanBody(
                         Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             Text(
                                 "Hold a File-Transfer compatible peripheral close to your device",
+                                modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
                                 fontWeight = FontWeight.Bold
                             )
@@ -116,6 +127,7 @@ private fun ScanBody(
                                 getFileTransferPeripheralsScannedText(
                                     numMatchingDevicesOutOfRangeFound
                                 ),
+                                modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
                                 color = Color.Gray,
                             )
@@ -125,6 +137,7 @@ private fun ScanBody(
                         Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             Text(
                                 "Status:",
+                                modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.Center,
                                 fontWeight = FontWeight.Bold
                             )
@@ -133,6 +146,12 @@ private fun ScanBody(
                     }
                 }
             }
+
+            if (BuildConfig.DEBUG) {
+                Text("[Debug] Found: $numDevicesFound devices")
+                Text("[Debug] Matching: $numMatchingDevicesInRangeFound devices")
+            }
+
         }
     }
 }
@@ -148,14 +167,17 @@ private fun getFileTransferPeripheralsScannedText(numDevices: Int): String {
 private fun getStatusDetailText(uiState: ScanViewModel.ScanUiState): String {
     val text = when (uiState) {
         ScanViewModel.ScanUiState.Scanning -> "Scanning..."
+        ScanViewModel.ScanUiState.SetupConnection -> "Preparing connection..."
         ScanViewModel.ScanUiState.Connected -> "Connected..."
         ScanViewModel.ScanUiState.Connecting -> "Connecting..."
-        is ScanViewModel.ScanUiState.Disconnected -> "Disconnected: ${uiState.error}"
+        ScanViewModel.ScanUiState.CheckingFileTransferVersion -> "Checking FileTransfer version"
+        ScanViewModel.ScanUiState.SetupFileTransfer -> "Setup FileTransfer service"
         ScanViewModel.ScanUiState.Discovering -> "Discovering Services..."
-        is ScanViewModel.ScanUiState.FileTransferError -> "Error initializing FileTransfer"
         ScanViewModel.ScanUiState.FileTransferReady -> "FileTransfer service ready"
         ScanViewModel.ScanUiState.RestoringConnection -> "Restoring connection..."
-        is ScanViewModel.ScanUiState.ScanningError -> "Scanning error: ${uiState.error}"
+        is ScanViewModel.ScanUiState.FileTransferError -> "Error initializing FileTransfer"
+        is ScanViewModel.ScanUiState.Disconnected -> if (uiState.cause != null) "Disconnected: ${uiState.cause}" else "Disconnected"
+        is ScanViewModel.ScanUiState.ScanningError -> "Scanning error: ${uiState.cause}"
     }
 
     return text
@@ -194,7 +216,7 @@ private fun Wave(color: Color = Color.Black, scale: Float = 1f, lineWidth: Float
     val strokeWidth = LocalDensity.current.run { (lineWidth / scale).toDp() }
 
     Box(
-        modifier = Modifier
+        Modifier
             .aspectRatio(1f)
             .scale(scale)
             .border(BorderStroke(strokeWidth, color), CircleShape)
@@ -209,8 +231,8 @@ private fun ScanPreview() {
     GliderTheme {
 
         BackgroundGradientDefault {
-            //   Waves()
-            ScanBody(PaddingValues(0.dp))
+            Waves()
+            //ScanBody(PaddingValues(0.dp))
         }
 
     }
