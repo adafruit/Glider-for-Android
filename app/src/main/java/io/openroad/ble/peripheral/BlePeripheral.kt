@@ -366,7 +366,7 @@ open class BlePeripheral(
         }
         commandQueue.add(command)
     }
-
+ 
     fun characteristicDisableNotify(
         characteristic: BluetoothGattCharacteristic,
         completionHandler: CompletionHandler
