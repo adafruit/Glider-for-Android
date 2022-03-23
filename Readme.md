@@ -22,7 +22,7 @@ custom firmware. See GitHub for protocol details:
 
 
 
-## Intalling the debug APK
+## Installing the debug APK
 
 #### Android Permissions to sideload apps
 
