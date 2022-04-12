@@ -1,7 +1,7 @@
 > **Work-in-progress.** 
 
 > This repository contains a work-in-progress version of File Glider for Android.
-Source code for the iOS app is here: [https://github.com/adafruit/Glider-for-iOS](https://github.com/adafruit/Glider-for-iOS)**
+Source code for the iOS app is here: [https://github.com/adafruit/Glider-for-iOS](https://github.com/adafruit/Glider-for-iOS)
 
 
 

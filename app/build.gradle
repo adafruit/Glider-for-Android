@@ -74,6 +74,9 @@ dependencies {
     // Startup initializer
     implementation "androidx.startup:startup-runtime:1.1.1"
 
+    // Material icons
+    implementation "androidx.compose.material:material-icons-extended:$compose_version"
+
     // Test
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'

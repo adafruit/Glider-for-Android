@@ -13,14 +13,20 @@ import android.os.Looper
 import androidx.annotation.MainThread
 import com.adafruit.glider.BuildConfig
 import io.openroad.ble.*
-import io.openroad.ble.filetransfer.BleFileTransferPeripheral
+import io.openroad.ble.bond.BleBondState
+import io.openroad.ble.bond.BleBondStateDataSource
 import io.openroad.ble.state.BleState
+import io.openroad.ble.utils.BleKnownPeripheralAddresses
 import io.openroad.ble.utils.toHexString
 import io.openroad.utils.LogUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.util.*
 
 // Constants
@@ -37,7 +43,8 @@ private val kProfileTimeouts = BuildConfig.DEBUG && true
 
 //
 open class BlePeripheral(
-    scanResult: ScanResult
+    scanResult: ScanResult,
+    internal val externalScope: CoroutineScope = MainScope()
 ) {
     companion object {
         // Global Parameter that affects all rssi measurements. 1 means don't use a running average. The closer to 0 the more resistant the value it is to change
@@ -50,7 +57,11 @@ open class BlePeripheral(
     // Data - Private
     private val log by LogUtils()
     private var _runningRssi: Int? = null       // Backing variable for rssi
-    private var mtuSize: Int = kDefaultMtuSize
+    var mtuSize: Int = kDefaultMtuSize; private set
+
+    // Data - Private - Bonding
+    var bleBondDataSource: BleBondStateDataSource? = null
+    var bondStateJob: Job? = null
 
     // Data - Private - Cached values to speed up processing
     private var cachedNameNeedsUpdate = true
@@ -59,6 +70,7 @@ open class BlePeripheral(
 
     // Data - State
     sealed class ConnectionState {
+        object Start : ConnectionState()
         object Connecting : ConnectionState()
         object Connected : ConnectionState()
         data class Disconnecting(val cause: Throwable? = null) : ConnectionState()
@@ -80,10 +92,8 @@ open class BlePeripheral(
         }
     }
 
-
-    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected())
+    private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Start)
     val connectionState = _connectionState.asStateFlow()
-
 
     fun confirmConnectionState(requiredConnectionState: ConnectionState) =
         connectionState.value == requiredConnectionState
@@ -93,6 +103,10 @@ open class BlePeripheral(
             throw BleInvalidStateException()
         }
     }
+
+    // Data - Bonding information
+    private val _bondingState = MutableStateFlow(BleBondState.Unknown)
+    val bondingState = _bondingState.asStateFlow()
 
     // Data - Advertising
     val createdMillis =
@@ -186,6 +200,7 @@ open class BlePeripheral(
     // region Lifecycle
     init {
     }
+
     // endregion
 
     // region Connection
@@ -202,8 +217,10 @@ open class BlePeripheral(
         }
 
         // Confirm that is disconnected before starting connection (because it can already be connected)
-        if (!confirmConnectionState(requiredConnectionState = ConnectionState.Disconnected())) {
-            _connectionState.update { ConnectionState.Disconnected(BleConnectionInvalidStateException()) }
+        if (!confirmConnectionState(requiredConnectionState = ConnectionState.Start)) {
+            _connectionState.update {
+                ConnectionState.Disconnected(BleConnectionInvalidStateException())
+            }
             return
         }
 
@@ -213,6 +230,30 @@ open class BlePeripheral(
         connectionHandlerThread = thread
 
         val context = applicationContext
+
+        // Start bonding information listener
+        val currentBondState = BleBondState.from(scanResult.value.device.bondState)
+        bondStateJob = externalScope.launch {
+            bleBondDataSource =
+                BleBondStateDataSource(applicationContext, address, currentBondState)
+            bleBondDataSource?.bleBondStateFlow?.collect { bondState ->
+
+                _bondingState.update { bondState }
+                when (bondState) {
+                    BleBondState.Bonding -> log.info("$nameOrAddress bonding")
+                    BleBondState.Bonded -> {
+                        log.info("$nameOrAddress bonded")
+
+                        // Save bonded information
+                        BleKnownPeripheralAddresses.addPeripheralAddress(address)
+                    }
+                    BleBondState.NotBonded -> log.info("$nameOrAddress not bonded")
+                    else -> {
+                        log.warning("$nameOrAddress unknown bondState: $bondState")
+                    }
+                }
+            }
+        }
 
         // Start connection attempts
         reconnectionAttempts = 0
@@ -268,6 +309,11 @@ open class BlePeripheral(
                 ConnectionState.Disconnected(cause)
             }
         }
+
+        bondStateJob?.cancel()
+        bondStateJob = null
+        bleBondDataSource = null
+
         cancelConnectionHandlerThread()
         closeBluetoothGatt()
     }
@@ -366,7 +412,7 @@ open class BlePeripheral(
         }
         commandQueue.add(command)
     }
- 
+
     fun characteristicDisableNotify(
         characteristic: BluetoothGattCharacteristic,
         completionHandler: CompletionHandler
@@ -495,6 +541,43 @@ open class BlePeripheral(
         return properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
     }
 
+    fun writeCharacteristic(
+        characteristic: BluetoothGattCharacteristic,
+        writeType: Int,
+        data: ByteArray,
+        completionHandler: CompletionHandler
+    ) {
+        val identifier =
+            if (kDebugCommands) getCharacteristicIdentifier(
+                characteristic.service.uuid,
+                characteristic.uuid
+            ) else null
+
+        val command =
+            object : BleCommand(BLECOMMANDTYPE_WRITECHARACTERISTIC, identifier, completionHandler) {
+                @SuppressLint("MissingPermission")
+                override fun execute() {
+                    if (bluetoothGatt != null) {
+                        // Write value
+                        characteristic.writeType = writeType
+                        characteristic.value = data
+                        val success = bluetoothGatt!!.writeCharacteristic(characteristic)
+                        if (success) {
+                            // Simulate response if needed
+                            // Android: no need to simulate response: https://stackoverflow.com/questions/43741849/oncharacteristicwrite-and-onnotificationsent-are-being-called-too-fast-how-to/43744888
+                        } else {
+                            log.warning("writeCharacteristic could not be initiated")
+                            finishExecutingCommand(BluetoothGatt.GATT_FAILURE)
+                        }
+                    } else {
+                        log.warning("bluetoothGatt is null")
+                        finishExecutingCommand(BluetoothGatt.GATT_FAILURE)
+                    }
+                }
+            }
+        commandQueue.add(command)
+    }
+
     // endregion
 
     // region Descriptors
@@ -587,7 +670,7 @@ open class BlePeripheral(
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
 
-
+            log.info("onConnectionStateChange: $newState")
             Handler(Looper.getMainLooper()).post {          // Not needed ??
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     when (newState) {
@@ -650,7 +733,8 @@ open class BlePeripheral(
             status: Int
         ) {
             super.onCharacteristicRead(gatt, characteristic, status)
-            log.info("onCharacteristicRead")
+
+            log.info("onCharacteristicRead: ${characteristic.uuid.toString()}")
             if (kDebugCommands) {
                 val identifier = getCharacteristicIdentifier(characteristic)
                 val command = commandQueue.first()
@@ -679,7 +763,7 @@ open class BlePeripheral(
             characteristic: BluetoothGattCharacteristic
         ) {
             super.onCharacteristicChanged(gatt, characteristic)
-            log.info("onCharacteristicChanged. numCaptureReadHandlers: " + captureReadHandlers.size)
+            //log.info("onCharacteristicChanged. numCaptureReadHandlers: " + captureReadHandlers.size)
             val identifier: String = getCharacteristicIdentifier(characteristic)
             val status =
                 BluetoothGatt.GATT_SUCCESS // On Android, there is no error reported for this callback, so we assume it is SUCCESS
@@ -714,6 +798,7 @@ open class BlePeripheral(
             // Notify
             if (!isNotifyOmitted) {
                 val notifyHandler = notifyHandlers[identifier]
+                log.info("onCharacteristicChanged. notify: ${if (notifyHandler == null) "no" else "yes"}")
                 notifyHandler?.let { it(status) }
             }
 

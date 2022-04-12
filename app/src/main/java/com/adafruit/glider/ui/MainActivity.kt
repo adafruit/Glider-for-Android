@@ -22,13 +22,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.adafruit.glider.GliderApplication
 import com.adafruit.glider.R
+import com.adafruit.glider.ui.fileexplorer.FileEditScaffoldingScreen
+import com.adafruit.glider.ui.fileexplorer.FileExplorerScaffoldingScreen
 import com.adafruit.glider.ui.scan.ScanScreen
 import com.adafruit.glider.ui.startup.StartupScreen
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.utils.observeAsState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import io.openroad.ble.applicationContext
 import io.openroad.ble.getNeededPermissions
 import io.openroad.ble.isLocationEnabled
 
@@ -72,8 +76,8 @@ fun GliderNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
-    val backstackEntry = navController.currentBackStackEntryAsState()
-    val currentScreen = GliderScreen.fromRoute(backstackEntry.value?.destination?.route)
+    val backStackEntry = navController.currentBackStackEntryAsState()
+    val currentScreen = ScreenRoute.fromRoute(backStackEntry.value?.destination?.route)
 
     // Check if location is enabled on Android lower than 12
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
@@ -81,7 +85,7 @@ fun GliderNavHost(
         if (lifeCycleState.value == Lifecycle.Event.ON_RESUME) {
             if (!isLocationEnabled(LocalContext.current)) {
                 LaunchedEffect(lifeCycleState) {
-                    navController.navigate(GliderScreen.BluetoothStatus.name)
+                    navController.navigate(ScreenRoute.BluetoothStatus.route)
                 }
             }
         }
@@ -90,8 +94,7 @@ fun GliderNavHost(
     // Check Bluetooth-related permissions state
     val bluetoothPermissionState = rememberMultiplePermissionsState(getNeededPermissions())
     val isInitialPermissionsCheckInProgress =
-        !bluetoothPermissionState.allPermissionsGranted && currentScreen == GliderScreen.Startup && !bluetoothPermissionState.shouldShowRationale
-
+        !bluetoothPermissionState.allPermissionsGranted && currentScreen == ScreenRoute.Startup && !bluetoothPermissionState.shouldShowRationale
 
     if (!bluetoothPermissionState.allPermissionsGranted) {
         LaunchedEffect(bluetoothPermissionState) {
@@ -100,7 +103,7 @@ fun GliderNavHost(
                 bluetoothPermissionState.launchMultiplePermissionRequest()
             } else {
                 // Not at startup or not first time permissions are needed => Go to BluetoothStatus screen
-                navController.navigate(GliderScreen.BluetoothStatus.name)
+                navController.navigate(ScreenRoute.BluetoothStatus.route)
             }
         }
     }
@@ -108,30 +111,49 @@ fun GliderNavHost(
     // NavHost
     NavHost(
         navController = navController,
-        startDestination = GliderScreen.Startup.name,
+        startDestination = ScreenRoute.Startup.route,
         modifier = modifier
     ) {
 
-        composable(GliderScreen.Startup.name) {
+        composable(ScreenRoute.Startup.route) {
             StartupScreen(isInitialPermissionsCheckInProgress) {
                 // on finish startup
-                navController.navigate(GliderScreen.Scan.name) {
+                navController.navigate(ScreenRoute.Scan.route) {
                     // Don't go back to startup on pop
-                    popUpTo(GliderScreen.Startup.name) {
+                    popUpTo(ScreenRoute.Startup.route) {
                         inclusive = true
                     }
                 }
             }
         }
-        composable(GliderScreen.BluetoothStatus.name) {
-            // TODO
-        }
-        composable(GliderScreen.Scan.name) {
-            ScanScreen()
 
-        }
-        composable(GliderScreen.ConnectedTab.name) {
+        composable(ScreenRoute.BluetoothStatus.route) {
             // TODO
+        }
+
+        composable(ScreenRoute.Scan.route) {
+            ScanScreen { fileTransferClient ->
+                // on finish scan -> go to connected
+                val appContainer = (applicationContext as GliderApplication).appContainer
+                appContainer.fileTransferClient = fileTransferClient        // TODO: clean this. it should be in appContainer
+
+                navController.navigate(ScreenRoute.ConnectedTab.route)
+            }
+        }
+
+        composable(ScreenRoute.ConnectedTab.route) {
+            //ConnectedTabScreen()
+            FileExplorerScaffoldingScreen() { selectedFilePath ->
+                // on file selected
+                navController.navigate(ScreenRoute.FileEdit.createRoute(selectedFilePath))
+            }
+        }
+
+        composable(ScreenRoute.FileEdit.route) { backStackEntry ->
+            val pathArg = backStackEntry.arguments?.getString("path")
+            requireNotNull(pathArg) { "path parameter not found" }
+            val path = ScreenRoute.FileEdit.decodePathArg(pathArg)
+            FileEditScaffoldingScreen(path, navController)
         }
     }
 }

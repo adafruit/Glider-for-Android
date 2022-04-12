@@ -37,3 +37,7 @@ data class BleConnectionException internal constructor(
 class BleDiscoveryException internal constructor() : BleException()
 
 
+data class BleStatusResultException internal constructor(
+    val status: Int,
+) : BleException("Status: $status")
+

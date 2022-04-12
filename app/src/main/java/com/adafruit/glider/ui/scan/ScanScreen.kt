@@ -33,18 +33,22 @@ import com.adafruit.glider.ui.BackgroundGradientDefault
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.TopBarBackground
 import com.adafruit.glider.utils.observeAsState
+import io.openroad.ble.FileTransferClient
 
 @Composable
-fun ScanScreen(viewModel: ScanViewModel = viewModel()) {
+fun ScanScreen(
+    viewModel: ScanViewModel = viewModel(),
+    onFinished: (fileTransferClient: FileTransferClient) -> Unit
+) {
     // Start / Stop scanning based on lifecycle
     val lifeCycleState = LocalLifecycleOwner.current.lifecycle.observeAsState()
     if (lifeCycleState.value == Lifecycle.Event.ON_RESUME) {
         LaunchedEffect(lifeCycleState) {
-            viewModel.startScanning()
+            viewModel.onResume()
         }
     } else if (lifeCycleState.value == Lifecycle.Event.ON_PAUSE) {
         LaunchedEffect(lifeCycleState) {
-            viewModel.stopScanning()
+            viewModel.onPause()
         }
     }
 
@@ -59,7 +63,7 @@ fun ScanScreen(viewModel: ScanViewModel = viewModel()) {
         scaffoldState = scaffoldState,
     ) { innerPadding ->
         BackgroundGradientDefault {
-            ScanBody(innerPadding, viewModel, scaffoldState.snackbarHostState)
+            ScanBody(innerPadding, viewModel, scaffoldState.snackbarHostState, onFinished)
         }
     }
 }
@@ -68,7 +72,8 @@ fun ScanScreen(viewModel: ScanViewModel = viewModel()) {
 private fun ScanBody(
     innerPadding: PaddingValues,
     viewModel: ScanViewModel = viewModel(),
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onFinished: (fileTransferClient: FileTransferClient) -> Unit
 ) {
     // UI State
     val uiState by viewModel.uiState.collectAsState()
@@ -83,24 +88,32 @@ private fun ScanBody(
         0
     )
 
-    // Show snackbar if state is ScanningError
-    if (uiState is ScanViewModel.ScanUiState.ScanningError) {
-        val cause = (uiState as ScanViewModel.ScanUiState.ScanningError).cause
-        LaunchedEffect(cause) {
-            snackbarHostState.showSnackbar(message = "Scan error: $cause")
+    when (uiState) {
+        is ScanViewModel.ScanUiState.ScanningError -> {
+            // Show snackbar if state is ScanningError
+            val cause = (uiState as ScanViewModel.ScanUiState.ScanningError).cause
+            LaunchedEffect(cause) {
+                snackbarHostState.showSnackbar(message = "Scan error: $cause")
+            }
         }
+
+        is ScanViewModel.ScanUiState.FileTransferEnabled -> {
+            LaunchedEffect(uiState) {
+                onFinished((uiState as ScanViewModel.ScanUiState.FileTransferEnabled).fileTransferClient)
+            }
+        }
+        else -> {}
     }
 
     // UI
     Column(
-        modifier = Modifier
-            .padding(innerPadding),
+        modifier = Modifier.padding(innerPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Waves(
             Modifier
-                .weight(1f)
+                //.weight(1f)
                 .requiredWidthIn(max = 400.dp)
                 .padding(top = 20.dp)
         )
@@ -141,7 +154,11 @@ private fun ScanBody(
                                 textAlign = TextAlign.Center,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(getStatusDetailText(uiState), textAlign = TextAlign.Center)
+                            Text(
+                                getStatusDetailText(uiState),
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
@@ -151,7 +168,6 @@ private fun ScanBody(
                 Text("[Debug] Found: $numDevicesFound devices")
                 Text("[Debug] Matching: $numMatchingDevicesInRangeFound devices")
             }
-
         }
     }
 }
@@ -170,10 +186,10 @@ private fun getStatusDetailText(uiState: ScanViewModel.ScanUiState): String {
         ScanViewModel.ScanUiState.SetupConnection -> "Preparing connection..."
         ScanViewModel.ScanUiState.Connected -> "Connected..."
         ScanViewModel.ScanUiState.Connecting -> "Connecting..."
-        ScanViewModel.ScanUiState.CheckingFileTransferVersion -> "Checking FileTransfer version"
+        //ScanViewModel.ScanUiState.CheckingFileTransferVersion -> "Checking FileTransfer version"
         ScanViewModel.ScanUiState.SetupFileTransfer -> "Setup FileTransfer service"
         ScanViewModel.ScanUiState.Discovering -> "Discovering Services..."
-        ScanViewModel.ScanUiState.FileTransferReady -> "FileTransfer service ready"
+        is ScanViewModel.ScanUiState.FileTransferEnabled -> "FileTransfer service ready"
         ScanViewModel.ScanUiState.RestoringConnection -> "Restoring connection..."
         is ScanViewModel.ScanUiState.FileTransferError -> "Error initializing FileTransfer"
         is ScanViewModel.ScanUiState.Disconnected -> if (uiState.cause != null) "Disconnected: ${uiState.cause}" else "Disconnected"
