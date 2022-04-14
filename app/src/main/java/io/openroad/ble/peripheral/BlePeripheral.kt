@@ -7,9 +7,12 @@ package io.openroad.ble.peripheral
 import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.ScanResult
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.util.Log
+import androidx.annotation.IntRange
 import androidx.annotation.MainThread
 import com.adafruit.glider.BuildConfig
 import io.openroad.ble.*
@@ -658,6 +661,24 @@ open class BlePeripheral(
                         log.info("read: descriptor not found: $descriptorUUID")
                         finishExecutingCommand(BluetoothGatt.GATT_READ_NOT_PERMITTED)
                     }
+                }
+            }
+        commandQueue.add(command)
+    }
+
+    open fun requestMtu(
+        @IntRange(from = 23, to = 517) mtuSize: Int,
+        completionHandler: CompletionHandler
+    ) {
+        val identifier: String? = null
+        val command: BleCommand =
+            object : BleCommand(BLECOMMANDTYPE_REQUESTMTU, identifier, completionHandler) {
+                @SuppressLint("MissingPermission")
+                override fun execute() {
+                    // Request mtu size change
+                    log.info("Request mtu change to $mtuSize")
+                    bluetoothGatt?.requestMtu(mtuSize)
+
                 }
             }
         commandQueue.add(command)
