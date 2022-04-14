@@ -35,7 +35,7 @@ val kFileTransferDebugMessagesEnabled = BuildConfig.DEBUG && true
 typealias FileTransferDataHandler = (data: ByteArray) -> Unit
 typealias FileTransferProgressHandler = (transmittedBytes: Int, totalBytes: Int) -> Unit
 
-const val kPreferredMtuSize = 517
+const val kPreferredMtuSize = 512
 
 const val kReadFileResponseHeaderSize = 16      // (1+1+2+4+4+4+variable)
 const val kListDirectoryResponseHeaderSize = 28      // (1+1+2+4+4+4+8+4+variable)

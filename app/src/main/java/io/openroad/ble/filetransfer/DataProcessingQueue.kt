@@ -48,5 +48,16 @@ class DataProcessingQueue {
         } else {
             log.info("Queue size: ${byteArray.size} bytes. Waiting for more data to process packet...")
         }
+
+        // If there is still unprocessed chunks in the queue, process the next one
+        val isDataAvailable = data.size() > 0
+        val isStillUnprocessedDataInQueue = processedDataCount > 0  && isDataAvailable
+        if (isStillUnprocessedDataInQueue) {
+            log.info("Unprocessed data still in queue ${data.size()} bytes). Try to process next packet")
+            processQueuedChunks(processingHandler)
+        }
+        else if (!isDataAvailable) {
+            log.info("Data queue empty")
+        }
     }
 }
