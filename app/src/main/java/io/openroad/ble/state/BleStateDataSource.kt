@@ -10,7 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import com.adafruit.glider.BuildConfig
-import io.openroad.ble.getBleState
+import io.openroad.ble.BleManager
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.onFailure
@@ -50,7 +50,7 @@ class BleStateDataSource(context: Context) {
         }
 
         // Set initial value
-        trySend(getBleState(context))
+        trySend(BleManager.getBleState(context))
 
         // Register receiver
         val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)

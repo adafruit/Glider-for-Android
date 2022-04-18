@@ -8,18 +8,16 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.adafruit.glider.BuildConfig
-import io.openroad.ble.FileTransferClient
+import io.openroad.ble.BleManager
 import io.openroad.ble.applicationContext
 import io.openroad.ble.filetransfer.BleFileTransferPeripheral
 import io.openroad.ble.filetransfer.kFileTransferServiceUUID
-import io.openroad.ble.getBluetoothAdapter
 import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.ble.scanner.BlePeripheralScanner
 import io.openroad.ble.scanner.isManufacturerAdafruit
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.lang.reflect.Method
 import java.util.*
 
 const val kMinRssiToAutoConnect = -80 //-100                    // in dBM
@@ -38,9 +36,10 @@ class ScanViewModel(
         object Connected : ScanUiState()
         object Discovering : ScanUiState()
         object SetupFileTransfer : ScanUiState()
+        object Bonding: ScanUiState()
 
         //data class FileTransferError(val cause: Throwable) : ScanUiState()
-        data class FileTransferEnabled(val fileTransferClient: FileTransferClient) : ScanUiState()
+        data class FileTransferEnabled(val fileTransferPeripheral: BleFileTransferPeripheral) : ScanUiState()
         data class FileTransferError(val gattErrorCode: Int) : ScanUiState()
         data class Disconnected(val cause: Throwable?) : ScanUiState()
     }
@@ -73,14 +72,15 @@ class ScanViewModel(
         .map { blePeripherals ->
             // Only peripherals that are manufactured by Adafruit and include theFileTransfer service
             blePeripherals
-                .filter { it.scanRecord?.isManufacturerAdafruit() ?: false }
-                /*
+
             .map {
-                log.info("found: ${it.nameOrAddress} -> rssi: ${it.currentRssi}")
+                log.info("found: ${it.nameOrAddress} -> rssi: ${it.rssi.value}")
                 it
-            }*/
+            }
                 .filter {
-                    val serviceUuids: List<UUID>? = it.scanRecord?.serviceUuids?.map { it.uuid }
+                    it.scanRecord()?.isManufacturerAdafruit() ?: false }
+                .filter {
+                    val serviceUuids: List<UUID>? = it.scanRecord()?.serviceUuids?.map { it.uuid }
                     serviceUuids?.contains(kFileTransferServiceUUID) ?: false
                 }
                 .sortedBy { it.createdMillis }
@@ -94,9 +94,9 @@ class ScanViewModel(
         }*/
 
     val numMatchingPeripheralsOutOfRangeFound = matchingPeripheralsFound
-        .map { it.filter { it.currentRssi <= kMinRssiToAutoConnect }.size }
+        .map { it.filter { it.rssi.value <= kMinRssiToAutoConnect }.size }
     val numMatchingPeripheralsInRangeFound = matchingPeripheralsFound
-        .map { it.filter { it.currentRssi > kMinRssiToAutoConnect }.size }
+        .map { it.filter { it.rssi.value > kMinRssiToAutoConnect }.size }
 
 
     // region Lifecycle
@@ -108,10 +108,8 @@ class ScanViewModel(
                 .collect { bleException ->
                     _uiState.update { ScanUiState.ScanningError(bleException) }
                 }
-
         }
     }
-
 
     fun onResume() {
         // Start scanning if we are in the scanning state
@@ -120,7 +118,7 @@ class ScanViewModel(
             // Force remove bonding information
             if (BuildConfig.DEBUG || true) {
                 try {
-                    val bondedDevices = getBluetoothAdapter(applicationContext)?.bondedDevices
+                    val bondedDevices = BleManager.getBluetoothAdapter(applicationContext)?.bondedDevices
                     log.info("Bound devices: $bondedDevices")
 
                     bondedDevices?.forEach { device ->
@@ -175,7 +173,7 @@ class ScanViewModel(
                         // Take peripherals that have been matching more than kMinTimeDetectingPeripheralForAutoconnect
                         .filter { currentTime - it.createdMillis > kMinTimeDetectingPeripheralForAutoconnect }
                         // Take the one with higher RSSI
-                        .maxByOrNull { it.currentRssi }
+                        .maxByOrNull { it.rssi.value }
 
 
                 if (selectedPeripheral != null) {
@@ -214,13 +212,13 @@ class ScanViewModel(
 
     private suspend fun connect(blePeripheral: BlePeripheral) {
         // Create a BleFileTransferPeripheral
-        //val fileTransferPeripheral = BleFileTransferPeripheral(blePeripheral)
-        val fileTransferClient = FileTransferClient(blePeripheral)
+        val fileTransferPeripheral = BleFileTransferPeripheral(blePeripheral)
+        //val fileTransferClient = FileTransferClient(blePeripheral)
 
         // Link state changes with UI
         fileTransferPeripheralStateJob = viewModelScope.launch {
             //fileTransferPeripheral.fileTransferState
-            fileTransferClient.fileTransferState
+            fileTransferPeripheral.fileTransferState
                 .onCompletion { exception ->
                     log.info("fileTransferPeripheralStateJob onCompletion: $exception")
                 }
@@ -248,13 +246,15 @@ class ScanViewModel(
                         BleFileTransferPeripheral.FileTransferState.CheckingFileTransferVersion -> {
                             _uiState.update { ScanUiState.SetupFileTransfer }
                         }
+                        BleFileTransferPeripheral.FileTransferState.Bonding -> {
+                            _uiState.update { ScanUiState.Bonding }
+                        }
                         BleFileTransferPeripheral.FileTransferState.EnablingNotifications -> {
                             _uiState.update { ScanUiState.SetupFileTransfer }
                         }
                         BleFileTransferPeripheral.FileTransferState.Enabled -> {
-                            _uiState.update { ScanUiState.FileTransferEnabled(fileTransferClient) }
+                            _uiState.update { ScanUiState.FileTransferEnabled(fileTransferPeripheral) }
                         }
-
                         else -> {
                             log.warning("fileTransferState not managed during connect: $fileTransferState")
                         }
@@ -263,7 +263,9 @@ class ScanViewModel(
         }
 
         // Start connect
-        fileTransferClient.connectAndSetup()
+        fileTransferPeripheral.connectAndSetup { isConnected ->
+            log.info("FileTransferClient connect result: $isConnected")
+        }
     }
 
     // endregion

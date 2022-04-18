@@ -6,20 +6,19 @@ package io.openroad.ble.peripheral
 
 import android.annotation.SuppressLint
 import android.bluetooth.*
+import android.bluetooth.le.ScanRecord
 import android.bluetooth.le.ScanResult
-import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
-import android.util.Log
 import androidx.annotation.IntRange
 import androidx.annotation.MainThread
 import com.adafruit.glider.BuildConfig
 import io.openroad.ble.*
 import io.openroad.ble.bond.BleBondState
 import io.openroad.ble.bond.BleBondStateDataSource
+import io.openroad.ble.filetransfer.BleKnownPeripheralAddresses
 import io.openroad.ble.state.BleState
-import io.openroad.ble.utils.BleKnownPeripheralAddresses
 import io.openroad.ble.utils.toHexString
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.CoroutineScope
@@ -41,14 +40,25 @@ internal val kClientCharacteristicConfigUUID =
 // -    Sets a identifier for each command and verifies that the command processed is the one expected
 private val kDebugCommands = BuildConfig.DEBUG && true
 
+// TypeAllias
+typealias BlePeripheralConnectCompletionHandler = (isConnected: Boolean) -> Unit
+
 // -    Debug timeouts from commands
 private val kProfileTimeouts = BuildConfig.DEBUG && true
 
 //
 open class BlePeripheral(
-    scanResult: ScanResult,
+    private var bluetoothDevice: BluetoothDevice,
     internal val externalScope: CoroutineScope = MainScope()
 ) {
+    constructor(scanResult: ScanResult, externalScope: CoroutineScope = MainScope()) : this(
+        scanResult.device,
+        externalScope
+    ) {
+        _rssi.value = scanResult.rssi
+        _scanResult.value = scanResult
+    }
+
     companion object {
         // Global Parameter that affects all rssi measurements. 1 means don't use a running average. The closer to 0 the more resistant the value it is to change
         // const val rssiRunningAverageFactor = 1.0
@@ -59,7 +69,8 @@ open class BlePeripheral(
 
     // Data - Private
     private val log by LogUtils()
-    private var _runningRssi: Int? = null       // Backing variable for rssi
+
+    //private var _runningRssi: Int? = null       // Backing variable for rssi
     var mtuSize: Int = kDefaultMtuSize; private set
 
     // Data - Private - Bonding
@@ -116,14 +127,12 @@ open class BlePeripheral(
         System.currentTimeMillis()          // Time when it was created (usually the time when the advertising was discovered)
     var lastUpdateMillis = System.currentTimeMillis(); private set
 
-    private val _rssi: MutableStateFlow<Int> = MutableStateFlow(scanResult.rssi)
+    private val _rssi: MutableStateFlow<Int> = MutableStateFlow(-127)
     val rssi = _rssi.asStateFlow()
 
-    val currentRssi = rssi.value
-
     // Data - Connection
-    private val bluetoothDevice: BluetoothDevice = scanResult.device
     private var connectionHandlerThread: HandlerThread? = null
+    private var connectionCompletionHandler: BlePeripheralConnectCompletionHandler? = null
 
 /*
     var rssi: Int?                          // Latest rssi read (initial value from scanResult, but can be updated when remote reading rssi)
@@ -141,16 +150,17 @@ open class BlePeripheral(
         }*/
 
     // Data - ScanRecord Data
-    private val _scanResult: MutableStateFlow<ScanResult> = MutableStateFlow(scanResult)
+    private val _scanResult: MutableStateFlow<ScanResult?> = MutableStateFlow(null)
     val scanResult = _scanResult.asStateFlow()
 
     // TODO: encapsulate advertising data in separate class
-    val scanRecord = scanResult.scanRecord
+    fun scanRecord() = scanResult.value?.scanRecord
+
 
     val address: String
         get() {
             if (cachedAddress == null) {
-                cachedAddress = scanResult.value.device.address
+                cachedAddress = bluetoothDevice.address
             }
             return cachedAddress!!
         }
@@ -158,7 +168,7 @@ open class BlePeripheral(
     val name: String?
         get() {
             if (cachedNameNeedsUpdate) {
-                cachedName = scanRecord?.deviceName ?: remoteName
+                cachedName = scanRecord()?.deviceName ?: remoteName
                 cachedNameNeedsUpdate = false
             }
             return cachedName
@@ -170,7 +180,7 @@ open class BlePeripheral(
         get() {
             var result: String? = null
             try {
-                result = scanResult.value.device.name
+                result = bluetoothDevice.name
             } catch (e: SecurityException) {
                 log.severe("Security exception accessing remote name: $e")
             }
@@ -181,6 +191,7 @@ open class BlePeripheral(
     // region Scanning
     fun updateScanResult(scanResult: ScanResult) {
         lastUpdateMillis = System.currentTimeMillis()
+        bluetoothDevice = scanResult.device
         _scanResult.update { scanResult }
         _rssi.update { scanResult.rssi }     // Update rssi from scanResult
         cachedNameNeedsUpdate = true
@@ -199,23 +210,17 @@ open class BlePeripheral(
     private val notifyHandlers = HashMap<String, NotifyHandler>()
     private val captureReadHandlers = mutableListOf<CaptureReadHandler>()
 
-
-    // region Lifecycle
-    init {
-    }
-
-    // endregion
-
     // region Connection
 
 
     // TODO: convert connection and gattCallback to use Kotlin flows
     @SuppressLint("MissingPermission")
     @MainThread
-    fun connect() {
+    fun connect(completion: BlePeripheralConnectCompletionHandler) {
         // Confirm that ble state is enabled
-        if (!confirmBleState(requiredState = BleState.Enabled)) {
+        if (!BleManager.confirmBleState(requiredState = BleState.Enabled)) {
             _connectionState.update { ConnectionState.Disconnected(BleInvalidStateException()) }
+            completion(false)
             return
         }
 
@@ -224,6 +229,7 @@ open class BlePeripheral(
             _connectionState.update {
                 ConnectionState.Disconnected(BleConnectionInvalidStateException())
             }
+            completion(false)
             return
         }
 
@@ -235,7 +241,7 @@ open class BlePeripheral(
         val context = applicationContext
 
         // Start bonding information listener
-        val currentBondState = BleBondState.from(scanResult.value.device.bondState)
+        val currentBondState = BleBondState.from(bluetoothDevice.bondState)
         bondStateJob = externalScope.launch {
             bleBondDataSource =
                 BleBondStateDataSource(applicationContext, address, currentBondState)
@@ -262,8 +268,9 @@ open class BlePeripheral(
         reconnectionAttempts = 0
         commandQueue.clear()
         _connectionState.update { ConnectionState.Connecting }
-        cancelDiscovery(context)    // Note: always cancel discovery before connecting
+        BleManager.cancelDiscovery(context)    // Note: always cancel discovery before connecting
 
+        connectionCompletionHandler = completion
         bluetoothGatt = bluetoothDevice.connectGatt(
             context,
             false,
@@ -276,7 +283,13 @@ open class BlePeripheral(
         if (bluetoothGatt == null) {
             log.severe("connectGatt Error. Returns null")
             cancelConnectionHandlerThread()
-            throw BleException("connectGatt returns null")
+            completion(false)
+            connectionCompletionHandler = null
+            _connectionState.update {
+                ConnectionState.Disconnected(BleConnectionInvalidStateException())
+            }
+            return
+            //throw BleException("connectGatt returns null")
         }
 
         // Wait for connection status in gattCallback
@@ -316,6 +329,9 @@ open class BlePeripheral(
         bondStateJob?.cancel()
         bondStateJob = null
         bleBondDataSource = null
+
+        connectionCompletionHandler?.let { it(false) }
+        connectionCompletionHandler = null
 
         cancelConnectionHandlerThread()
         closeBluetoothGatt()
@@ -698,6 +714,7 @@ open class BlePeripheral(
                         BluetoothProfile.STATE_CONNECTED -> {
                             log.info("Connection state changed: CONNECTED")
                             _connectionState.update { ConnectionState.Connected }
+                            connectionCompletionHandler?.let { it(true) }
                         }
                         BluetoothProfile.STATE_DISCONNECTED -> {
                             log.info("Connection state changed: DISCONNECTED")
@@ -714,7 +731,7 @@ open class BlePeripheral(
                         log.info("Connection error. Trying to reconnect... (Attempt $reconnectionAttempts)")
 
                         if (reconnectionAttempts == 2) {        // On the second reconnection attempt, clear the device cache. https://github.com/android/connectivity-samples/issues/18
-                            refreshDeviceCache(bluetoothGatt ?: gatt)
+                            BleManager.refreshDeviceCache(bluetoothGatt ?: gatt)
                         }
 
                         (bluetoothGatt ?: gatt).close()
@@ -728,7 +745,7 @@ open class BlePeripheral(
 
                         // Connect
                         bluetoothGatt =
-                            scanResult.device.connectGatt(
+                            bluetoothDevice.connectGatt(
                                 applicationContext,
                                 reconnectionAttempts == 2,      // Autoconnect true looks like can solve the problem but it will never timeout
                                 this,
@@ -885,7 +902,8 @@ open class BlePeripheral(
             super.onReadRemoteRssi(gatt, rssi, status)
 
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                this@BlePeripheral._runningRssi = rssi
+                _rssi.update { rssi }
+                //this@BlePeripheral._runningRssi = rssi
                 //localBroadcastUpdate(kBlePeripheral_OnRssiUpdated, address)
             } else {
                 log.info("onReadRemoteRssi error: $status")

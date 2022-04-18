@@ -14,7 +14,6 @@ import io.openroad.utils.LogUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
-
 private const val kScanForgetDevicesEnabled = true
 private const val kScanForgetDevicesInterval: Long = 2000       // in milliseconds
 private const val kScanIntervalToForgetDevice = 4500L            // in milliseconds
@@ -112,10 +111,10 @@ class BlePeripheralScanner(
         if (existingPeripheral != null) {
             existingPeripheral.updateScanResult(scanResult)
         } else {
-            val device = BlePeripheral(scanResult)
+            val blePeripheral = BlePeripheral(scanResult)
 
             //log.info("Found: ${device.nameOrAddress}\nServices: ${device.scanRecord?.serviceUuids?.joinToString { it.uuid.toString() } ?: "none"}")
-            blePeripherals.add(device)
+            blePeripherals.add(blePeripheral)
         }
     }
 
@@ -124,15 +123,6 @@ class BlePeripheralScanner(
         //log.info("forgetOldDevices");
         val currentTime = System.currentTimeMillis()
         blePeripherals.removeIf { currentTime - it.lastUpdateMillis > kScanIntervalToForgetDevice }
-
-        /*
-        val numPeripherals: Int = blePeripherals.size
-        for (i in numPeripherals - 1 downTo 0) {
-            if (currentTime - blePeripherals[i].lastUpdateMillis > kScanIntervalToForgetDevice) {
-                val blePeripheral = blePeripherals.removeAt(i)
-                log.info("Forget peripheral: ${blePeripheral.nameOrAddress}");
-            }
-        }*/
     }
     // endregion
 }

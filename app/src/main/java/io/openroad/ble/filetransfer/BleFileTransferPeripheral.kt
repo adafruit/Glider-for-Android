@@ -8,16 +8,14 @@ import com.adafruit.glider.BuildConfig
 import io.openroad.ble.BleDiscoveryException
 import io.openroad.ble.BleException
 import io.openroad.ble.BleStatusResultException
-import io.openroad.ble.peripheral.BlePeripheral
-import io.openroad.ble.peripheral.CompletionHandler
-import io.openroad.ble.peripheral.NotifyHandler
+import io.openroad.ble.bond.BleBondState
+import io.openroad.ble.peripheral.*
 import io.openroad.ble.peripheral.kClientCharacteristicConfigUUID
 import io.openroad.ble.utils.*
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
-import java.lang.ref.WeakReference
 import java.sql.Timestamp
 import java.util.*
 
@@ -56,7 +54,12 @@ class BleFileTransferPeripheral(
 
     private var readStatus: ReadStatus? = null
     private var writeStatus: WriteStatus? = null
+    private var deleteStatus: DeleteStatus? = null
     private var listDirectoryStatus: ListDirectoryStatus? = null
+    private var makeDirectoryStatus: MakeDirectoryStatus? = null
+    private var moveStatus: MoveStatus? = null
+
+    private var setupCompletionHandler: BlePeripheralConnectCompletionHandler? = null
 
     // States
     sealed class FileTransferState {
@@ -70,6 +73,7 @@ class BleFileTransferPeripheral(
         object Discovering : FileTransferState()
         object CheckingFileTransferVersion : FileTransferState()
         object EnablingNotifications : FileTransferState()
+        object Bonding : FileTransferState()
         object Enabled : FileTransferState()
         data class GattError(val gattErrorCode: Int) : FileTransferState()
         data class Error(val cause: Throwable? = null) : FileTransferState()
@@ -102,9 +106,10 @@ class BleFileTransferPeripheral(
         blePeripheral.externalScope.launch {
             // Listen to state changes
             blePeripheral.connectionState
-                .onStart {
-                    log.info("blePeripheral.connectionState onStart")
-                }
+                /*
+            .onStart {
+                log.info("blePeripheral.connectionState onStart")
+            }*/
                 .onCompletion { exception ->
                     log.info("blePeripheral.connectionState onCompletion: $exception")
                 }
@@ -116,7 +121,7 @@ class BleFileTransferPeripheral(
                             _fileTransferState.update { FileTransferState.Discovering }
 
                             //  Discover
-                            discoverServices()
+                            discoverServicesAndEnableFileTransfer()
                         }
                         is BlePeripheral.ConnectionState.Disconnecting -> _fileTransferState.update {
                             FileTransferState.Disconnecting(connectionState.cause)
@@ -127,6 +132,14 @@ class BleFileTransferPeripheral(
                         }
                     }
                 }
+
+            blePeripheral.bondingState.collect { bondState ->
+                when (bondState) {
+                    BleBondState.Bonding -> _fileTransferState.update { FileTransferState.Bonding }
+                    else -> {}
+                }
+            }
+
         }
     }
     // endregion
@@ -134,18 +147,27 @@ class BleFileTransferPeripheral(
     // region Actions
 
     @MainThread
-    fun connect() {
+    fun connectAndSetup(completion: BlePeripheralConnectCompletionHandler) {
         cleanCachedState()
 
+        setupCompletionHandler = null
         // Connects using the standard connect function but the state changes will be collected to trigger the next steps in the FileTransfer setup
-        blePeripheral.connect()
+        blePeripheral.connect { isConnected ->
+            // if connected, wait to call completion until setup has finished
+            if (isConnected) {
+                setupCompletionHandler = completion
+            } else {
+                completion(false)
+            }
+        }
     }
 
     private fun cleanCachedState() {
         fileTransferVersion = null
+        setupCompletionHandler = null
     }
 
-    private fun discoverServices() {
+    private fun discoverServicesAndEnableFileTransfer() {
         log.info("Discovering services...")
         blePeripheral.discoverServices { discoverStatus ->
             if (discoverStatus == BluetoothGatt.GATT_SUCCESS) {
@@ -159,6 +181,8 @@ class BleFileTransferPeripheral(
                             FileTransferState.GattError(fileTransferStatus)
                         else FileTransferState.Enabled
                     }
+
+                    setupCompletionHandler?.let { it(true) }
                 }
             } else {
                 blePeripheral.disconnect(BleDiscoveryException())
@@ -195,7 +219,10 @@ class BleFileTransferPeripheral(
                 blePeripheral.requestMtu(kPreferredMtuSize) {
 
                     // Set notify
-                    setNotifyResponse(fileTransferCharacteristic, ::receiveFileTransferData) { notifyState ->
+                    setNotifyResponse(
+                        fileTransferCharacteristic,
+                        ::receiveFileTransferData
+                    ) { notifyState ->
                         completion(notifyState)
                     }
                 }
@@ -290,9 +317,35 @@ class BleFileTransferPeripheral(
                 offset.toByteArray32bit() +
                 timestamp.toByteArray64bit() +
                 totalSize.toByteArray32bit()
-                path.toByteArray()
+        path.toByteArray()
 
         sendCommand(commandData) { result ->
+            if (completion != null) {
+                result.exceptionOrNull()?.let { exception ->
+                    completion(Result.failure(exception))
+                }
+            }
+        }
+    }
+
+    fun deleteFile(
+        path: String,
+        completion: ((Result<Unit>) -> Unit)? = null
+    ) {
+        log.info("Delete file from $path")
+
+        if (deleteStatus != null) {
+            log.warning("Warning: concurrent deleteFile")
+        }
+
+        deleteStatus = DeleteStatus(completion = completion)
+
+        val pathSize = path.codePoints().count().toInt()
+        val data = byteArrayOf(0x30, 0x00) +
+                pathSize.toByteArray16bit() +
+                path.toByteArray()
+
+        sendCommand(data) { result ->
             if (completion != null) {
                 result.exceptionOrNull()?.let { exception ->
                     completion(Result.failure(exception))
@@ -326,6 +379,69 @@ class BleFileTransferPeripheral(
             }
         }
     }
+
+
+    fun makeDirectory(
+        path: String,
+        completion: ((Result<Date?>) -> Unit)? = null
+    ) {
+        log.info("Make directory $path")
+
+        if (makeDirectoryStatus != null) {
+            log.warning("Warning: concurrent makeDirectory")
+        }
+
+        makeDirectoryStatus = MakeDirectoryStatus(completion = completion)
+
+        val pathSize = path.codePoints().count().toInt()
+        val timestamp = System.currentTimeMillis() * 1000 * 1000
+
+        val data = byteArrayOf(0x40, 0x00) +
+                pathSize.toByteArray16bit() +
+                timestamp.toByteArray64bit() +
+                path.toByteArray()
+
+        sendCommand(data) { result ->
+            if (completion != null) {
+                result.exceptionOrNull()?.let { exception ->
+                    completion(Result.failure(exception))
+                }
+            }
+        }
+    }
+
+    fun moveFile(
+        fromPath: String,
+        toPath: String,
+        completion: ((Result<Unit>) -> Unit)? = null
+    ) {
+        log.info("Move file from $fromPath to $toPath")
+
+        if (moveStatus != null) {
+            log.warning("Warning: concurrent moveDirectory")
+        }
+
+        moveStatus = MoveStatus(completion = completion)
+
+        val fromPathSize = fromPath.codePoints().count().toInt()
+        val toPathSize = toPath.codePoints().count().toInt()
+
+        val data = byteArrayOf(0x60, 0x00) +
+                fromPathSize.toByteArray16bit() +
+                toPathSize.toByteArray16bit() +
+                fromPath.toByteArray() +
+                byteArrayOf(0x00) +      // Padding byte
+                toPath.toByteArray()
+
+        sendCommand(data) { result ->
+            if (completion != null) {
+                result.exceptionOrNull()?.let { exception ->
+                    completion(Result.failure(exception))
+                }
+            }
+        }
+    }
+
     // endregion
 
     // region Receive Data
@@ -429,8 +545,6 @@ class BleFileTransferPeripheral(
             return Int.MAX_VALUE
         }
     }
-
-
 
     private fun decodeListDirectory(data: ByteArray): Int {
         listDirectoryStatus?.let { listDirectoryStatus ->
@@ -648,11 +762,43 @@ class BleFileTransferPeripheral(
         val data: ByteArray,
         val progress: FileTransferProgressHandler? = null,
         val completion: ((Result<Date?>) -> Unit)? = null
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as WriteStatus
+
+            if (!data.contentEquals(other.data)) return false
+            if (progress != other.progress) return false
+            if (completion != other.completion) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = data.contentHashCode()
+            result = 31 * result + (progress?.hashCode() ?: 0)
+            result = 31 * result + (completion?.hashCode() ?: 0)
+            return result
+        }
+    }
+
+    private data class DeleteStatus(
+        val completion: ((Result<Unit>) -> Unit)? = null
     )
 
     private data class ListDirectoryStatus(
         var entries: MutableList<DirectoryEntry> = mutableListOf(),
         val completion: ((Result<List<DirectoryEntry>?>) -> Unit)? = null
+    )
+
+    private data class MakeDirectoryStatus(
+        val completion: ((Result<Date?>) -> Unit)? = null
+    )
+
+    private data class MoveStatus(
+        val completion: ((Result<Unit>) -> Unit)? = null
     )
 
     // endregion

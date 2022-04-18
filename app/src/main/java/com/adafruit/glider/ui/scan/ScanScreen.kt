@@ -34,11 +34,12 @@ import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.TopBarBackground
 import com.adafruit.glider.utils.observeAsState
 import io.openroad.ble.FileTransferClient
+import io.openroad.ble.filetransfer.BleFileTransferPeripheral
 
 @Composable
 fun ScanScreen(
     viewModel: ScanViewModel = viewModel(),
-    onFinished: (fileTransferClient: FileTransferClient) -> Unit
+    onFinished: (fileTransferPeripheral: BleFileTransferPeripheral) -> Unit
 ) {
     // Start / Stop scanning based on lifecycle
     val lifeCycleState = LocalLifecycleOwner.current.lifecycle.observeAsState()
@@ -73,7 +74,7 @@ private fun ScanBody(
     innerPadding: PaddingValues,
     viewModel: ScanViewModel = viewModel(),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
-    onFinished: (fileTransferClient: FileTransferClient) -> Unit
+    onFinished: (fileTransferPeripheral: BleFileTransferPeripheral) -> Unit
 ) {
     // UI State
     val uiState by viewModel.uiState.collectAsState()
@@ -99,7 +100,7 @@ private fun ScanBody(
 
         is ScanViewModel.ScanUiState.FileTransferEnabled -> {
             LaunchedEffect(uiState) {
-                onFinished((uiState as ScanViewModel.ScanUiState.FileTransferEnabled).fileTransferClient)
+                onFinished((uiState as ScanViewModel.ScanUiState.FileTransferEnabled).fileTransferPeripheral)
             }
         }
         else -> {}
@@ -188,6 +189,7 @@ private fun getStatusDetailText(uiState: ScanViewModel.ScanUiState): String {
         ScanViewModel.ScanUiState.Connecting -> "Connecting..."
         //ScanViewModel.ScanUiState.CheckingFileTransferVersion -> "Checking FileTransfer version"
         ScanViewModel.ScanUiState.SetupFileTransfer -> "Setup FileTransfer service"
+        ScanViewModel.ScanUiState.Bonding -> "Waiting to pair peripheral..."
         ScanViewModel.ScanUiState.Discovering -> "Discovering Services..."
         is ScanViewModel.ScanUiState.FileTransferEnabled -> "FileTransfer service ready"
         ScanViewModel.ScanUiState.RestoringConnection -> "Restoring connection..."

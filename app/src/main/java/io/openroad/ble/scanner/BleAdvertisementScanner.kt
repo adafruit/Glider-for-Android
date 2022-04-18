@@ -10,9 +10,8 @@ import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import io.openroad.ble.BleManager
 import io.openroad.ble.BleScanException
-import io.openroad.ble.getBluetoothAdapter
-import io.openroad.ble.isBleStateAndPermissionsReady
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -38,14 +37,14 @@ class BleAdvertisementScanner(
     matchMode: Int = ScanSettings.MATCH_MODE_STICKY
 ) {
 
-    private val scanner = getBluetoothAdapter(context)?.bluetoothLeScanner
+    private val scanner = BleManager.getBluetoothAdapter(context)?.bluetoothLeScanner
     private val log by LogUtils()
 
     var isScanning = false; private set
 
     @SuppressLint("MissingPermission")
     val scanResultFlow: Flow<List<ScanResult>> = callbackFlow {
-        if (scanner == null || !isBleStateAndPermissionsReady(context)) {
+        if (scanner == null || !BleManager.isBleStateAndPermissionsReady(context)) {
             cancel("scanResultFlow cannot start")
         } else {
             val callback = object : ScanCallback() {

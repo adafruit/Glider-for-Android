@@ -2,6 +2,7 @@ package io.openroad.ble
 
 import io.openroad.ble.filetransfer.BleFileTransferPeripheral
 import io.openroad.ble.peripheral.BlePeripheral
+import io.openroad.ble.peripheral.BlePeripheralConnectCompletionHandler
 import java.util.*
 
 /**
@@ -10,53 +11,85 @@ import java.util.*
 
 typealias ProgressHandler = (transmittedBytes: Int, totalBytes: Int) -> Unit
 
-class FileTransferClient(blePeripheral: BlePeripheral) {
+class FileTransferClient(private val bleFileTransferPeripheral: BleFileTransferPeripheral) {
 
-    private val fileTransferPeripheral: BleFileTransferPeripheral =
-        BleFileTransferPeripheral(blePeripheral)
-    val fileTransferState = fileTransferPeripheral.fileTransferState
+    constructor(blePeripheral: BlePeripheral) : this(BleFileTransferPeripheral(blePeripheral))
 
-    val peripheralName = fileTransferPeripheral.nameOrAddress
+    //private val fileTransferPeripheral: BleFileTransferPeripheral = BleFileTransferPeripheral(blePeripheral)
+    val fileTransferState = bleFileTransferPeripheral.fileTransferState
 
-    fun connectAndSetup() {
-        fileTransferPeripheral.connect()
+    val peripheralName = bleFileTransferPeripheral.nameOrAddress
+
+    fun connectAndSetup(completion: BlePeripheralConnectCompletionHandler) {
+        bleFileTransferPeripheral.connectAndSetup(completion)
     }
 
     // region File Transfer Commands
 
-    /*
-         Given a full path, returns the full contents of the file
+    /**
+    Given a full path, returns the full contents of the file
      */
     fun readFile(
         path: String,
         progress: ProgressHandler? = null,
         completion: ((Result<ByteArray>) -> Unit)? = null
     ) {
-        fileTransferPeripheral.readFile(path, progress, completion)
+        bleFileTransferPeripheral.readFile(path, progress, completion)
     }
 
-    /*
-       Writes the content to the given full path. If the file exists, it will be overwritten
-   */
+    /**
+    Writes the content to the given full path. If the file exists, it will be overwritten
+     */
     fun writeFile(
         path: String,
         data: ByteArray,
         progress: ProgressHandler? = null,
         completion: ((Result<Date?>) -> Unit)? = null
     ) {
-        fileTransferPeripheral.writeFile(path, data, progress, completion)
+        bleFileTransferPeripheral.writeFile(path, data, progress, completion)
     }
 
-    /*
-        Lists all of the contents in a directory given a full path. Returned paths are relative to the given path to reduce duplication
+    /**
+    Deletes the file or directory at the given full path. Directories must be empty to be deleted
+     */
+    fun deleteFile(
+        path: String,
+        completion: ((Result<Unit>) -> Unit)? = null
+    ) {
+        bleFileTransferPeripheral.deleteFile(path, completion)
+    }
+
+    /**
+    Creates a new directory at the given full path. If a parent directory does not exist, then it will also be created. If any name conflicts with an existing file, an error will be returned
+    @param path: Full path
+     */
+    fun makeDirectory(
+        path: String,
+        completion: ((Result<Date?>) -> Unit)? = null
+    ) {
+        bleFileTransferPeripheral.makeDirectory(path, completion)
+    }
+
+
+    /**
+    Lists all of the contents in a directory given a full path. Returned paths are relative to the given path to reduce duplication
      */
     fun listDirectory(
         path: String,
         completion: ((Result<List<BleFileTransferPeripheral.DirectoryEntry>?>) -> Unit)?
     ) {
-        fileTransferPeripheral.listDirectory(path, completion)
+        bleFileTransferPeripheral.listDirectory(path, completion)
     }
 
-
+    /**
+    Moves a single file from fromPath to toPath
+     */
+    fun moveFile(
+        fromPath: String,
+        toPath: String,
+        completion: ((Result<Unit>) -> Unit)? = null
+    ) {
+        bleFileTransferPeripheral.moveFile(fromPath, toPath, completion)
+    }
     // endregion
 }

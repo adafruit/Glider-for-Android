@@ -5,8 +5,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -14,11 +16,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.adafruit.glider.GliderApplication
 import com.adafruit.glider.ui.BackgroundGradientDefault
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.TopBarBackground
-import io.openroad.ble.applicationContext
+import io.openroad.ble.filetransfer.FileTransferConnectionManager
 import io.openroad.ble.utils.filenameFromPath
 
 /**
@@ -65,10 +66,11 @@ fun FileEditScreen(
 ) {
     // on Appear
     val fileTransferClient =
-        (applicationContext as GliderApplication).appContainer.fileTransferClient
+        //(applicationContext as GliderApplication).appContainer.fileTransferClient
+        FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
 
     LaunchedEffect(Unit) {
-        fileTransferClient?.let { fileTransferClient ->
+        fileTransferClient.value?.let { fileTransferClient ->
             viewModel.setup(
                 filePath = path,
                 fileTransferClient = fileTransferClient

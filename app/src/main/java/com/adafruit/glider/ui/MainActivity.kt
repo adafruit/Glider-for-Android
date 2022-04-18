@@ -32,9 +32,9 @@ import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.utils.observeAsState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import io.openroad.ble.BleManager
 import io.openroad.ble.applicationContext
-import io.openroad.ble.getNeededPermissions
-import io.openroad.ble.isLocationEnabled
+import io.openroad.ble.filetransfer.FileTransferConnectionManager
 
 // region Lifecycle
 class MainActivity : ComponentActivity() {
@@ -83,7 +83,7 @@ fun GliderNavHost(
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
         val lifeCycleState = LocalLifecycleOwner.current.lifecycle.observeAsState()
         if (lifeCycleState.value == Lifecycle.Event.ON_RESUME) {
-            if (!isLocationEnabled(LocalContext.current)) {
+            if (!BleManager.isLocationEnabled(LocalContext.current)) {
                 LaunchedEffect(lifeCycleState) {
                     navController.navigate(ScreenRoute.BluetoothStatus.route)
                 }
@@ -92,7 +92,7 @@ fun GliderNavHost(
     }
 
     // Check Bluetooth-related permissions state
-    val bluetoothPermissionState = rememberMultiplePermissionsState(getNeededPermissions())
+    val bluetoothPermissionState = rememberMultiplePermissionsState(BleManager.getNeededPermissions())
     val isInitialPermissionsCheckInProgress =
         !bluetoothPermissionState.allPermissionsGranted && currentScreen == ScreenRoute.Startup && !bluetoothPermissionState.shouldShowRationale
 
@@ -118,7 +118,14 @@ fun GliderNavHost(
         composable(ScreenRoute.Startup.route) {
             StartupScreen(isInitialPermissionsCheckInProgress) {
                 // on finish startup
-                navController.navigate(ScreenRoute.Scan.route) {
+                val reconnectedFileTransferClient = FileTransferConnectionManager.selectedFileTransferClient.value
+                val screenRoute = if (reconnectedFileTransferClient != null) {
+                    ScreenRoute.ConnectedTab
+                } else {
+                    ScreenRoute.Startup
+                }
+
+                navController.navigate(screenRoute.route) {
                     // Don't go back to startup on pop
                     popUpTo(ScreenRoute.Startup.route) {
                         inclusive = true
@@ -132,12 +139,20 @@ fun GliderNavHost(
         }
 
         composable(ScreenRoute.Scan.route) {
-            ScanScreen { fileTransferClient ->
+            ScanScreen { fileTransferPeripheral ->
                 // on finish scan -> go to connected
+                /*
                 val appContainer = (applicationContext as GliderApplication).appContainer
                 appContainer.fileTransferClient = fileTransferClient        // TODO: clean this. it should be in appContainer
+                */
+                FileTransferConnectionManager.setSelectedPeripheral(fileTransferPeripheral)
 
-                navController.navigate(ScreenRoute.ConnectedTab.route)
+                navController.navigate(ScreenRoute.ConnectedTab.route) {
+                    // Don't go back to scan on pop
+                    popUpTo(ScreenRoute.Startup.route) {
+                        inclusive = true
+                    }
+                }
             }
         }
 
@@ -146,6 +161,7 @@ fun GliderNavHost(
             FileExplorerScaffoldingScreen() { selectedFilePath ->
                 // on file selected
                 navController.navigate(ScreenRoute.FileEdit.createRoute(selectedFilePath))
+
             }
         }
 

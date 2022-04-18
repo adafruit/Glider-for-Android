@@ -8,6 +8,8 @@ import io.openroad.utils.LogUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.*
+import kotlin.Comparator
 
 /**
  * Created by Antonio García (antonio@openroad.es)
@@ -84,6 +86,197 @@ open class FileCommandsViewModel() : ViewModel() {
         }
     }
 
+    fun makeDirectory(path: String, fileTransferClient: FileTransferClient) {
+        startCommand(description = "Creating $path")
+        _isTransmitting.update { true }
+
+        fileTransferClient.makeDirectory(path) { result ->
+            _isTransmitting.update { false }
+
+            result.fold(
+                onSuccess = { date ->
+
+                    listDirectory(this.path.value, fileTransferClient)
+
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.MakeDirectory
+                        )
+                    }
+                },
+
+                onFailure = { exception ->
+                    log.warning("makeDirectory $path error: $exception")
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.Error(
+                                exception.localizedMessage ?: "Unknown Error"
+                            )
+                        )
+                    }
+                }
+            )
+
+            endCommand()
+        }
+    }
+
+    fun makeFile(filename: String, fileTransferClient: FileTransferClient) {
+        writeFile(
+            filename = filename,
+            data = byteArrayOf(),
+            fileTransferClient = fileTransferClient
+        ) { result ->
+            result.getOrNull()?.let {
+                // On success, force list again directory
+                listDirectory(directory = this.path.value, fileTransferClient = fileTransferClient)
+            }
+        }
+    }
+
+    fun renameFile(fromPath: String, toPath: String, fileTransferClient: FileTransferClient) {
+        moveFile(fromPath, toPath, fileTransferClient) { result ->
+            result.getOrNull()?.let {
+                // On success, force list again directory
+                listDirectory(directory = this.path.value, fileTransferClient = fileTransferClient)
+            }
+        }
+    }
+
+    fun readFile(
+        filePath: String,
+        fileTransferClient: FileTransferClient,
+        completion: ((Result<ByteArray>) -> Unit)? = null
+    ) {
+        startCommand(description = "Reading $filePath")
+        _isTransmitting.update { true }
+
+        fileTransferClient.readFile(filePath, progress = { transmittedBytes, totalBytes ->
+            _transmissionProgress.value?.transmittedBytes = transmittedBytes
+            _transmissionProgress.value?.totalBytes = totalBytes
+        }, completion = { result ->
+            _isTransmitting.update { false }
+
+            result.fold(
+                onSuccess = { data ->
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.Read(
+                                data.size
+                            )
+                        )
+                    }
+                    completion?.let { it(Result.success(data)) }
+
+                },
+
+                onFailure = { exception ->
+                    log.warning("readFile $filePath error: $exception")
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.Error(
+                                exception.localizedMessage ?: "Unknown Error"
+                            )
+                        )
+                    }
+                    completion?.let { it(Result.failure(exception)) }
+                }
+            )
+
+            endCommand()
+        })
+    }
+
+    fun writeFile(
+        filename: String,
+        data: ByteArray,
+        fileTransferClient: FileTransferClient,
+        completion: ((Result<Date?>) -> Unit)? = null
+    ) {
+        startCommand(description = "Writing $filename")
+        _isTransmitting.update { true }
+
+        fileTransferClient.writeFile(
+            path = filename,
+            data = data,
+            progress = { transmittedBytes, totalBytes ->
+                _transmissionProgress.value?.transmittedBytes = transmittedBytes
+                _transmissionProgress.value?.totalBytes = totalBytes
+            },
+            completion = { result ->
+                _isTransmitting.update { false }
+
+                result.fold(
+                    onSuccess = { date ->
+                        _lastTransmit.update {
+                            TransmissionLog(
+                                type = TransmissionLog.TransmissionType.Write(
+                                    data.size, date
+                                )
+                            )
+                        }
+                        completion?.let { it(Result.success(date)) }
+                    },
+
+                    onFailure = { exception ->
+                        log.warning("writeFile $filename error: $exception")
+                        _lastTransmit.update {
+                            TransmissionLog(
+                                type = TransmissionLog.TransmissionType.Error(
+                                    exception.localizedMessage ?: "Unknown Error"
+                                )
+                            )
+                        }
+                        completion?.let { it(Result.failure(exception)) }
+                    }
+                )
+
+                endCommand()
+            })
+    }
+
+    fun moveFile(
+        fromPath: String,
+        toPath: String,
+        fileTransferClient: FileTransferClient,
+        completion: ((Result<Unit>) -> Unit)? = null
+    ) {
+        startCommand(description = "Moving from $fromPath to $toPath")
+        _isTransmitting.update { true }
+
+        fileTransferClient.moveFile(
+            fromPath = fromPath,
+            toPath = toPath
+        ) { result ->
+            _isTransmitting.update { false }
+
+            result.fold(
+                onSuccess = {
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.Move
+                        )
+                    }
+                    completion?.let { it(Result.success(Unit)) }
+                },
+
+                onFailure = { exception ->
+                    log.warning("moveFile from $fromPath to $path error: $exception")
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.Error(
+                                exception.localizedMessage ?: "Unknown Error"
+                            )
+                        )
+                    }
+                    completion?.let { it(Result.failure(exception)) }
+                }
+            )
+
+            endCommand()
+        }
+    }
+
     private fun setEntries(entries: List<BleFileTransferPeripheral.DirectoryEntry>) {
         // Filter if needed
         val filteredEntries =
@@ -112,53 +305,6 @@ open class FileCommandsViewModel() : ViewModel() {
                 else -> if (a.isDirectory) -1 else 1
             }
         }
-    }
-
-    fun readFile(
-        filePath: String,
-        fileTransferClient: FileTransferClient,
-        completion: ((Result<ByteArray>) -> Unit)? = null
-    ) {
-        startCommand(description = "Reading $filePath")
-        _isTransmitting.update { true }
-
-        fileTransferClient.readFile(filePath, progress = { transmittedBytes, totalBytes ->
-            _transmissionProgress.value?.transmittedBytes = transmittedBytes
-            _transmissionProgress.value?.totalBytes = totalBytes
-        }, completion = { result ->
-            _isTransmitting.update { false }
-
-            result.fold(
-                onSuccess = { data ->
-                    _lastTransmit.update {
-                        TransmissionLog(
-                            type = TransmissionLog.TransmissionType.Read(
-                                data.size
-                            )
-                        )
-                    }
-                    if (completion != null) {
-                        completion(Result.success(data))
-                    }
-                },
-
-                onFailure = { exception ->
-                    log.warning("readFile $filePath error: $exception")
-                    _lastTransmit.update {
-                        TransmissionLog(
-                            type = TransmissionLog.TransmissionType.Error(
-                                exception.localizedMessage ?: "Unknown Error"
-                            )
-                        )
-                    }
-                    if (completion != null) {
-                        completion(Result.failure(exception))
-                    }
-                }
-            )
-
-            endCommand()
-        })
     }
 
     // endregion

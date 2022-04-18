@@ -24,7 +24,9 @@ import com.adafruit.glider.ui.BackgroundGradientDefault
 import com.adafruit.glider.ui.theme.GliderTheme
 import io.openroad.ble.applicationContext
 import io.openroad.ble.filetransfer.BleFileTransferPeripheral
+import io.openroad.ble.filetransfer.FileTransferConnectionManager
 import io.openroad.ble.utils.upPath
+import io.openroad.utils.LogUtils
 
 /**
  * Created by Antonio García (antonio@openroad.es)
@@ -38,11 +40,11 @@ fun FileSystemScreen(
     viewModel: FileSystemViewModel = viewModel(),
     onFileSelected: (String) -> Unit,
 ) {
-    val fileTransferClient =
-        (applicationContext as GliderApplication).appContainer.fileTransferClient
+    //val fileTransferClient =  (applicationContext as GliderApplication).appContainer.fileTransferClient
+    val fileTransferClient = FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
 
     LaunchedEffect(Unit) {
-        fileTransferClient?.let { fileTransferClient ->
+        fileTransferClient.value?.let { fileTransferClient ->
             viewModel.showOnlyDirectories = showOnlyDirectories
             viewModel.setup(
                 directory = path,
@@ -63,7 +65,7 @@ fun FileSystemScreen(
                 onClick = {
                     val newPath = upPath(from = path)
                     onPathChange(newPath)
-                    fileTransferClient?.let { fileTransferClient ->
+                    fileTransferClient.value?.let { fileTransferClient ->
                         viewModel.listDirectory(newPath, fileTransferClient)
                     }
                 },
@@ -103,7 +105,7 @@ fun FileSystemScreen(
                         onClick = {
                             val newPath = path + entry.name + "/"
                             onPathChange(newPath)
-                            fileTransferClient?.let { fileTransferClient ->
+                            fileTransferClient.value?.let { fileTransferClient ->
                                 viewModel.listDirectory(newPath, fileTransferClient)
                             }
                         },

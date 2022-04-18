@@ -1,4 +1,4 @@
-package io.openroad.ble.utils
+package io.openroad.ble.filetransfer
 
 import android.content.Context
 import io.openroad.ble.applicationContext

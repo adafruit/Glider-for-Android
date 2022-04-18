@@ -18,7 +18,7 @@ class AppContainer(context: Context) {
     private val log by LogUtils()
     var bleStateRepository: BleStateRepository
 
-    var fileTransferClient: FileTransferClient? = null      // TODO: move this from here
+   // var fileTransferClient: FileTransferClient? = null      // TODO: move this from here
 
     init {
         val bleStateDataSource = BleStateDataSource(context)
