@@ -122,7 +122,7 @@ fun GliderNavHost(
                 val screenRoute = if (reconnectedFileTransferClient != null) {
                     ScreenRoute.ConnectedTab
                 } else {
-                    ScreenRoute.Startup
+                    ScreenRoute.Scan
                 }
 
                 navController.navigate(screenRoute.route) {
