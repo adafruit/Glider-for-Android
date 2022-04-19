@@ -118,6 +118,16 @@ fun FileEditScreen(
                     backgroundColor = Color.Gray.copy(0.8f)
                 )
             }
+
+            // Wait View
+            Box(Modifier.align(Alignment.Center)) {
+                val isTransmitting by viewModel.isTransmitting.collectAsState()
+                val isLoading by FileTransferConnectionManager.isSelectedPeripheralReconnecting.collectAsState()
+                val isInteractionDisabled = isTransmitting || isLoading
+                if (isInteractionDisabled) {
+                    CircularProgressIndicator(color = Color.Gray)
+                }
+            }
         }
         /*
         Row(modifier = Modifier.fillMaxWidth()) {
