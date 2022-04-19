@@ -9,7 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -87,24 +89,36 @@ fun FileEditScreen(
             .padding(innerPadding)
             .padding(20.dp)
     ) {
-        TextField(
-            value = text ?: "",
-            onValueChange = {
-                viewModel.setText(it)
-            },
-            label = null,
+        Box(
             modifier = Modifier
                 .weight(1.0f)
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = TextFieldDefaults.textFieldColors(
-                backgroundColor = Color.White,
-                textColor = Color.Black,
-                cursorColor = Color.Black,
-                focusedIndicatorColor = Color.Transparent, //hide the indicator
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
-        )
+                .clip(RoundedCornerShape(4.dp))
+        ) {
+            TextField(
+                value = text ?: "",
+                onValueChange = {
+                    viewModel.setText(it)
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = null,
+                shape = RoundedCornerShape(8.dp),
+                colors = TextFieldDefaults.textFieldColors(
+                    backgroundColor = Color.White,
+                    textColor = Color.Black,
+                    cursorColor = Color.Black,
+                    focusedIndicatorColor = Color.Transparent, //hide the indicator
+                    unfocusedIndicatorColor = Color.Transparent,
+                ),
+            )
+
+            // Status bar
+            Box(Modifier.align(Alignment.BottomStart)) {
+                FileCommandStatusBarView(
+                    viewModel = viewModel,
+                    backgroundColor = Color.Gray.copy(0.8f)
+                )
+            }
+        }
         /*
         Row(modifier = Modifier.fillMaxWidth()) {
             
@@ -126,6 +140,4 @@ private fun FileEditScreenPreview() {
 
     }
 }
-
-
 //endregion

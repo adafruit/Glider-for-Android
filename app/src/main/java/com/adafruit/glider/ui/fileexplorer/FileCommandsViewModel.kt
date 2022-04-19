@@ -9,7 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.*
-import kotlin.Comparator
 
 /**
  * Created by Antonio García (antonio@openroad.es)
@@ -18,6 +17,9 @@ open class FileCommandsViewModel() : ViewModel() {
 
     // Params
     var showOnlyDirectories = false
+
+    // Data
+    private val log by LogUtils()
 
     // State
     private val _isRootDirectory = MutableStateFlow(true)
@@ -35,12 +37,13 @@ open class FileCommandsViewModel() : ViewModel() {
     val path = _path.asStateFlow()
 
     private val _isTransmitting = MutableStateFlow(false)
+    val isTransmitting = _isTransmitting.asStateFlow()
     private val _transmissionProgress = MutableStateFlow<TransmissionProgress?>(null)
+    val transmissionProgress = _transmissionProgress.asStateFlow()
     private val _lastTransmit = MutableStateFlow<TransmissionLog?>(null)
+    val lastTransmit = _lastTransmit.asStateFlow()
     //MutableStateFlow(TransmissionLog(TransmissionLog.TransmissionType.Write(334, null)))
 
-    // Data - Private
-    private val log by LogUtils()
 
     // region Actions
 

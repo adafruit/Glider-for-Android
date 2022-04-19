@@ -18,8 +18,8 @@ object FileTransferConnectionManager {
     private var _selectedFileTransferClient = MutableStateFlow<FileTransferClient?>(null)
     val selectedFileTransferClient = _selectedFileTransferClient.asStateFlow()
 
-    private var _isReconnecting = MutableStateFlow(false)
-    val isReconnecting = _isReconnecting.asStateFlow()
+    private var _isSelectedPeripheralReconnecting = MutableStateFlow(false)
+    val isSelectedPeripheralReconnecting = _isSelectedPeripheralReconnecting.asStateFlow()
 
     // region Actions
     fun setSelectedPeripheral(bleFileTransferPeripheral: BleFileTransferPeripheral) {
@@ -37,12 +37,12 @@ object FileTransferConnectionManager {
         val addresses = knownAddresses.intersect(pairedAddresses)
 
         if (addresses.isNotEmpty()) {
-            _isReconnecting.update { true }
+            _isSelectedPeripheralReconnecting.update { true }
             BleManager.reconnectToPeripherals(
                 applicationContext,
                 addresses
             ) { firstConnectedBleFileTransferPeripheral ->
-                _isReconnecting.update { false }
+                _isSelectedPeripheralReconnecting.update { false }
                 if (firstConnectedBleFileTransferPeripheral != null) {
                     log.info("Reconnected to ${firstConnectedBleFileTransferPeripheral.nameOrAddress}")
                     setSelectedPeripheral(firstConnectedBleFileTransferPeripheral)

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
@@ -55,11 +56,11 @@ fun FileExplorerScreen(
 ) {
 
     val mainColor = Color.White.copy(alpha = 0.7f)
-    //val appContainer = (LocalContext.current.applicationContext as GliderApplication).appContainer
     val fileTransferClient =
         FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
     val peripheralName = fileTransferClient.value?.peripheralName
     var path by remember { mutableStateOf("/") }
+    val isLoading by FileTransferConnectionManager.isSelectedPeripheralReconnecting.collectAsState()
 
     Column(
         Modifier
@@ -159,19 +160,30 @@ fun FileExplorerScreen(
         Box(
             Modifier
                 .border(BorderStroke(1.dp, mainColor), RoundedCornerShape(4.dp))
-                .padding(8.dp)
+                .clip(RoundedCornerShape(4.dp))
                 .fillMaxWidth()
                 .fillMaxHeight()
 
         ) {
-            FileSystemScreen(
-                path = path,
-                onPathChange = { path = it },
-                showOnlyDirectories = false,
-                viewModel = viewModel
-            ) { selectedFilePath ->
-                // on file selected
-                onFileSelected(selectedFilePath)
+            Box(
+                Modifier
+                    .padding(horizontal = 8.dp)
+                    .padding(bottom = 26.dp)        // Extra padding to take into account the bottom status bar
+            ) {
+                FileSystemScreen(
+                    path = path,
+                    onPathChange = { path = it },
+                    showOnlyDirectories = false,
+                    isLoading = isLoading,
+                    viewModel = viewModel
+                ) { selectedFilePath ->
+                    // on file selected
+                    onFileSelected(selectedFilePath)
+                }
+            }
+            // Status bar
+            Box(Modifier.align(Alignment.BottomStart)) {
+                FileCommandStatusBarView(viewModel = viewModel, backgroundColor = mainColor)
             }
         }
     }

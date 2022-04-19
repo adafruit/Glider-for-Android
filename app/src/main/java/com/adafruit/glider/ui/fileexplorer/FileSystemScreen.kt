@@ -19,14 +19,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.adafruit.glider.GliderApplication
 import com.adafruit.glider.ui.BackgroundGradientDefault
 import com.adafruit.glider.ui.theme.GliderTheme
-import io.openroad.ble.applicationContext
 import io.openroad.ble.filetransfer.BleFileTransferPeripheral
 import io.openroad.ble.filetransfer.FileTransferConnectionManager
 import io.openroad.ble.utils.upPath
-import io.openroad.utils.LogUtils
 
 /**
  * Created by Antonio García (antonio@openroad.es)
@@ -37,12 +34,14 @@ fun FileSystemScreen(
     path: String,
     onPathChange: (String) -> Unit,
     showOnlyDirectories: Boolean,
+    isLoading: Boolean,
     viewModel: FileSystemViewModel = viewModel(),
     onFileSelected: (String) -> Unit,
 ) {
-    //val fileTransferClient =  (applicationContext as GliderApplication).appContainer.fileTransferClient
-    val fileTransferClient = FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
+    val fileTransferClient =
+        FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
 
+    // On Appear -> Setup
     LaunchedEffect(Unit) {
         fileTransferClient.value?.let { fileTransferClient ->
             viewModel.showOnlyDirectories = showOnlyDirectories
@@ -53,77 +52,99 @@ fun FileSystemScreen(
         }
     }
 
-    val isRootDirectory by viewModel.isRootDirectory.collectAsState()
-    val entries by viewModel.entries.collectAsState()
-    //val path by viewModel.path.collectAsState()
 
-    val state = rememberScrollState()
-    Column(modifier = Modifier.verticalScroll(state)) {
-        if (!isRootDirectory) {
-            //item {
-            Button(
-                onClick = {
-                    val newPath = upPath(from = path)
-                    onPathChange(newPath)
-                    fileTransferClient.value?.let { fileTransferClient ->
-                        viewModel.listDirectory(newPath, fileTransferClient)
-                    }
-                },
-                colors = ButtonDefaults.textButtonColors(
-                    backgroundColor = Color.Transparent,
-                    contentColor = Color.White
-                ),
-                elevation = null,
-                contentPadding = PaddingValues(0.dp),
-            ) {
-                ItemRow(
-                    imageVector = Icons.Outlined.DriveFolderUpload,
-                    imageDescription = "Folder up",
-                    name = "..",
-                    size = null
-                )
+    Box(Modifier.fillMaxSize()) {
+
+        // Items
+        val isRootDirectory by viewModel.isRootDirectory.collectAsState()
+        val entries by viewModel.entries.collectAsState()
+
+        val state = rememberScrollState()
+        Column(modifier = Modifier.verticalScroll(state)) {
+            if (!isRootDirectory) {
+                //item {
+                Button(
+                    onClick = {
+                        val newPath = upPath(from = path)
+                        onPathChange(newPath)
+                        fileTransferClient.value?.let { fileTransferClient ->
+                            viewModel.listDirectory(newPath, fileTransferClient)
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        backgroundColor = Color.Transparent,
+                        contentColor = Color.White
+                    ),
+                    elevation = null,
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    ItemRow(
+                        imageVector = Icons.Outlined.DriveFolderUpload,
+                        imageDescription = "Folder up",
+                        name = "..",
+                        size = null
+                    )
+                }
+                //}
             }
-            //}
+
+            entries.forEach { entry ->
+                //items(entries) { entry ->
+                when (entry.type) {
+                    is BleFileTransferPeripheral.DirectoryEntry.EntryType.File -> {
+                        FileRow(
+                            name = entry.name,
+                            size = entry.type.size,
+                            isHidden = entry.isHidden
+                        ) {
+                            // On click
+                            onFileSelected(path + entry.name)
+                        }
+                    }
+
+                    is BleFileTransferPeripheral.DirectoryEntry.EntryType.Directory -> {
+                        Button(
+                            onClick = {
+                                val newPath = path + entry.name + "/"
+                                onPathChange(newPath)
+                                fileTransferClient.value?.let { fileTransferClient ->
+                                    viewModel.listDirectory(newPath, fileTransferClient)
+                                }
+                            },
+                            colors = ButtonDefaults.textButtonColors(
+                                backgroundColor = Color.Transparent,
+                                contentColor = if (entry.isHidden) Color.Gray else Color.White
+                            ),
+                            elevation = null,
+                            contentPadding = PaddingValues(0.dp),
+                        ) {
+                            ItemRow(
+                                imageVector = Icons.Outlined.Folder,
+                                imageDescription = "Directory",
+                                name = entry.name,
+                                size = null
+                            )
+                        }
+                    }
+                }
+            }
         }
 
-        entries.forEach { entry ->
-            //items(entries) { entry ->
-            when (entry.type) {
-                is BleFileTransferPeripheral.DirectoryEntry.EntryType.File -> {
-                    FileRow(
-                        name = entry.name,
-                        size = entry.type.size,
-                        isHidden = entry.isHidden
-                    ) {
-                        // On click
-                        onFileSelected(path + entry.name)
-                    }
-                }
+        Column(
+            modifier = Modifier.align(Alignment.Center),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Empty view
+            val isTransmitting by viewModel.isTransmitting.collectAsState()
+            if (!showOnlyDirectories && !isTransmitting && entries.isEmpty()) {
+                Text("No files found")
+            }
 
-                is BleFileTransferPeripheral.DirectoryEntry.EntryType.Directory -> {
-                    Button(
-                        onClick = {
-                            val newPath = path + entry.name + "/"
-                            onPathChange(newPath)
-                            fileTransferClient.value?.let { fileTransferClient ->
-                                viewModel.listDirectory(newPath, fileTransferClient)
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            backgroundColor = Color.Transparent,
-                            contentColor = if (entry.isHidden) Color.Gray else Color.White
-                        ),
-                        elevation = null,
-                        contentPadding = PaddingValues(0.dp),
-                    ) {
-                        ItemRow(
-                            imageVector = Icons.Outlined.Folder,
-                            imageDescription = "Directory",
-                            name = entry.name,
-                            size = null
-                        )
-                    }
-                }
+            // Wait view
+            val isInteractionDisabled = isTransmitting || isLoading
+            if (isInteractionDisabled) {
+                CircularProgressIndicator()
             }
         }
     }
@@ -188,7 +209,12 @@ private fun ItemRow(imageVector: ImageVector, imageDescription: String, name: St
 private fun ConnectedTabScreenPreview() {
     GliderTheme {
         BackgroundGradientDefault {
-            FileSystemScreen(path = "/", onPathChange = {}, showOnlyDirectories = false) { selectedFilePath ->
+            FileSystemScreen(
+                path = "/",
+                onPathChange = {},
+                isLoading = false,
+                showOnlyDirectories = false
+            ) { selectedFilePath ->
                 // on file selected
             }
         }
