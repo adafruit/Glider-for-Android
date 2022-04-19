@@ -10,10 +10,12 @@ import io.openroad.ble.BleException
 import io.openroad.ble.BleStatusResultException
 import io.openroad.ble.bond.BleBondState
 import io.openroad.ble.peripheral.*
-import io.openroad.ble.peripheral.kClientCharacteristicConfigUUID
 import io.openroad.ble.utils.*
 import io.openroad.utils.LogUtils
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.sql.Timestamp
@@ -35,10 +37,12 @@ typealias FileTransferProgressHandler = (transmittedBytes: Int, totalBytes: Int)
 
 const val kPreferredMtuSize = 512
 
-const val kReadFileResponseHeaderSize = 16      // (1+1+2+4+4+4+variable)
-const val kListDirectoryResponseHeaderSize = 28      // (1+1+2+4+4+4+8+4+variable)
-const val kDeleteFileResponseHeaderSize = 2     // (1+1)
-const val kMoveFileResponseHeaderSize = 2     // (1+1)
+const val kReadFileResponseHeaderSize = 16              // (1+1+2+4+4+4+variable)
+const val kWriteFileResponseHeaderSize = 20             // (1+1+2+4+8+4)
+const val kListDirectoryResponseHeaderSize = 28         // (1+1+2+4+4+4+8+4+variable)
+const val kMakeDirectoryResponseHeaderSize = 16         // (1+1+6+8)
+const val kDeleteFileResponseHeaderSize = 2             // (1+1)
+const val kMoveFileResponseHeaderSize = 2               // (1+1)
 
 
 class BleFileTransferPeripheral(
@@ -328,6 +332,29 @@ class BleFileTransferPeripheral(
         }
     }
 
+    private fun writeFileChunk(
+        offset: Int,
+        chunkSize: Int,
+        completion: ((Result<Unit>) -> Unit)? = null
+    ) {
+        writeStatus?.let { writeStatus ->
+            val chunkData = writeStatus.data.copyOfRange(offset, offset + chunkSize)
+
+            val data = byteArrayOf(0x22, 0x01, 0x00, 0x00) +
+                    offset.toByteArray32bit() +
+                    chunkSize.toByteArray32bit() +
+                    chunkData
+
+            if (kFileTransferDebugMessagesEnabled) {
+                log.info("write chunk at offset $offset chunkSize: $chunkSize. message size: ${data.size}. mtu: ${blePeripheral.mtuSize}")
+            }
+
+            sendCommand(data, completion)
+        } ?: run {
+            completion?.let { it(Result.failure(FileTransferInvalidInternalState())) }
+        }
+    }
+
     fun deleteFile(
         path: String,
         completion: ((Result<Unit>) -> Unit)? = null
@@ -468,7 +495,12 @@ class BleFileTransferPeripheral(
 
         bytesProcessed = when (command) {
             0x11.toByte() -> decodeReadFile(data)
+            0x21.toByte() -> decodeWriteFile(data)
+            0x31.toByte() -> decodeDeleteFile(data)
+            0x41.toByte() -> decodeMakeDirectory(data)
             0x51.toByte() -> decodeListDirectory(data)
+            0x61.toByte() -> decodeMoveFile(data)
+
             else -> {
                 log.warning("Error: unknown command: ${command.toHexString()}. Invalidating all received data...")
                 return Int.MAX_VALUE        // Invalidate all received data
@@ -501,10 +533,7 @@ class BleFileTransferPeripheral(
             // Report completion if status is not ok
             if (!isStatusOk) {
                 this.readStatus = null
-
-                if (completion != null) {
-                    completion(Result.failure(FileTransferStatusFailedException(status.toInt())))
-                }
+                completion?.let { it(Result.failure(FileTransferStatusFailedException(status.toInt()))) }
             }
 
             val packetSize = kReadFileResponseHeaderSize + chunkSize
@@ -525,20 +554,132 @@ class BleFileTransferPeripheral(
                 readFileChunk(offset + chunkSize, maxChunkLength) { result ->
                     result.exceptionOrNull()?.let { exception ->
                         this.readStatus = null
-                        if (completion != null) {
-                            completion(Result.failure(exception))
-                        }
+                        completion?.let { it(Result.failure(exception)) }
                     }
                 }
             } else {
                 val fileData = readStatus.data.toByteArray()
                 this.readStatus = null
-                if (completion != null) {
-                    completion(Result.success(fileData))
-                }
+                completion?.let { it(Result.success(fileData)) }
             }
 
             return packetSize
+
+        } ?: run {
+            log.warning("Error: read invalid internal status. Invalidating all received data...")
+            return Int.MAX_VALUE
+        }
+    }
+
+    private fun decodeWriteFile(data: ByteArray): Int {
+        writeStatus?.let { writeStatus ->
+            val completion = writeStatus.completion
+
+            if (data.size < kWriteFileResponseHeaderSize) {
+                // Header has not been fully received yet
+                return 0
+            }
+
+            var decodingOffset = 1
+            val status = data[decodingOffset]
+            val isStatusOk = status == 0x01.toByte()
+
+            decodingOffset = 4
+            val offset = data.readInt32(4)
+            decodingOffset += 4
+            val truncatedTime = data.readLong64(decodingOffset)
+            val writeDate = Date(Timestamp(truncatedTime).time)
+            decodingOffset += 8
+            val freeSpace = data.readInt32(decodingOffset)
+            if (kFileTransferDebugMessagesEnabled) {
+                log.info("write ${if (isStatusOk) "ok" else "error"} at offset $offset freeSpace: $freeSpace")
+            }
+
+            if (!isStatusOk) {
+                this.writeStatus = null
+                completion?.let { it(Result.failure(FileTransferStatusFailedException(status.toInt()))) }
+                return Int.MAX_VALUE
+            }
+
+            writeStatus.progress?.let {
+                it(offset, writeStatus.data.size)
+            }
+
+            if (offset >= writeStatus.data.size) {
+                this.writeStatus = null
+                completion?.let { it(Result.success(writeDate)) }
+
+            } else {
+                writeFileChunk(offset = offset, chunkSize = freeSpace) { result ->
+                    val exception = result.exceptionOrNull()
+                    if (exception != null) {
+                        this.writeStatus = null
+                        completion?.let { it(Result.failure(exception)) }
+                    }
+                }
+            }
+
+            return kWriteFileResponseHeaderSize
+
+        } ?: run {
+            log.warning("Error: read invalid internal status. Invalidating all received data...")
+            return Int.MAX_VALUE
+        }
+    }
+
+    private fun decodeDeleteFile(data: ByteArray): Int {
+        deleteStatus?.let { deleteStatus ->
+            val completion = deleteStatus.completion
+
+            if (data.size < kDeleteFileResponseHeaderSize) {
+                // Header has not been fully received yet
+                return 0
+            }
+
+            val status = data[1]
+            val isDeleted = status == 0x01.toByte()
+
+            this.deleteStatus = null
+            completion?.let {
+                if (isDeleted) {
+                    it(Result.success(Unit))
+                } else {
+                    it(Result.failure(FileTransferStatusFailedException(status.toInt())))
+                }
+            }
+
+            return kDeleteFileResponseHeaderSize
+
+        } ?: run {
+            log.warning("Error: read invalid internal status. Invalidating all received data...")
+            return Int.MAX_VALUE
+        }
+    }
+
+    private fun decodeMakeDirectory(data: ByteArray): Int {
+        makeDirectoryStatus?.let { makeDirectoryStatus ->
+            val completion = makeDirectoryStatus.completion
+
+            if (data.size < kMakeDirectoryResponseHeaderSize) {
+                // Header has not been fully received yet
+                return 0
+            }
+
+            val status = data[1]
+            val isCreated = status == 0x01.toByte()
+
+            this.makeDirectoryStatus = null
+            completion?.let {
+                if (isCreated) {
+                    val truncatedTime = data.readLong64(8)
+                    val modificationDate = Date(Timestamp(truncatedTime).time)
+                    it(Result.success(modificationDate))
+                } else {
+                    it(Result.failure(FileTransferStatusFailedException(status.toInt())))
+                }
+            }
+
+            return kMakeDirectoryResponseHeaderSize
 
         } ?: run {
             log.warning("Error: read invalid internal status. Invalidating all received data...")
@@ -564,9 +705,7 @@ class BleFileTransferPeripheral(
                 val entryCount = data.readInt32(8)
                 if (entryCount == 0) {
                     this.listDirectoryStatus = null
-                    if (completion != null) {
-                        completion(Result.success(emptyList()))
-                    }
+                    completion?.let { it(Result.success(emptyList())) }
                 } else {
                     val pathLength = data.readInt16(2)
                     val entryIndex = data.readInt32(4)
@@ -578,9 +717,7 @@ class BleFileTransferPeripheral(
                         if (kFileTransferDebugMessagesEnabled) {
                             log.info("list: finished")
                         }
-                        if (completion != null) {
-                            completion(Result.success(entries))
-                        }
+                        completion?.let { it(Result.success(entries)) }
                     } else {
                         val flags = data.readInt32(12)
                         val isDirectory = flags and 0x1 == 1
@@ -620,18 +757,14 @@ class BleFileTransferPeripheral(
 
                         } else {
                             this.listDirectoryStatus = null
-                            if (completion != null) {
-                                completion(Result.failure(FileTransferInvalidData()))
-                            }
+                            completion?.let { it(Result.failure(FileTransferInvalidData())) }
                         }
 
                     }
                 }
             } else {
                 this.listDirectoryStatus = null
-                if (completion != null) {
-                    completion(Result.success(null))        // null means directory does not exist
-                }
+                completion?.let { it(Result.success(null)) }        // null means directory does not exist
             }
 
             return packetSize
@@ -642,14 +775,41 @@ class BleFileTransferPeripheral(
         }
     }
 
+    private fun decodeMoveFile(data: ByteArray): Int {
+        moveStatus?.let { moveStatus ->
+            val completion = moveStatus.completion
+
+            if (data.size < kMoveFileResponseHeaderSize) {
+                // Header has not been fully received yet
+                return 0
+            }
+
+            val status = data[1]
+            val isMoved = status == 0x01.toByte()
+
+            this.moveStatus = null
+            completion?.let {
+                if (isMoved) {
+                    it(Result.success(Unit))
+                } else {
+                    it(Result.failure(FileTransferStatusFailedException(status.toInt())))
+                }
+            }
+
+            return kMoveFileResponseHeaderSize
+
+        } ?: run {
+            log.warning("Error: read invalid internal status. Invalidating all received data...")
+            return Int.MAX_VALUE
+        }
+    }
+
     private fun sendCommand(
         data: ByteArray,
         completion: ((Result<Unit>) -> Unit)?
     ) {
         if (!blePeripheral.confirmConnectionState(BlePeripheral.ConnectionState.Connected)) {
-            if (completion != null) {
-                completion(Result.failure(FileTransferDisconnected()))
-            }
+            completion?.let { it(Result.failure(FileTransferDisconnected())) }
         }
 
         fileTransferCharacteristic?.let { fileTransferCharacteristic ->
@@ -659,11 +819,11 @@ class BleFileTransferPeripheral(
                 WRITE_TYPE_NO_RESPONSE,
                 data
             ) { status ->
-                if (completion != null) {
+                completion?.let {
                     if (status == BluetoothGatt.GATT_SUCCESS) {
-                        completion(Result.success(Unit))
+                        it(Result.success(Unit))
                     } else {
-                        completion(Result.failure(BleStatusResultException(status)))
+                        it(Result.failure(BleStatusResultException(status)))
                     }
                 }
             }
@@ -806,10 +966,11 @@ class BleFileTransferPeripheral(
     // region Exceptions
     data class FileTransferStatusFailedException internal constructor(
         val code: Int,
-    ) : BleException("Status Failed: $code")
+    ) : BleException(if (code == 5) "status error $code. Filesystem in read-only mode" else "status error: $code")
 
     class FileTransferCharacteristicNotFound internal constructor() : BleException()
     class FileTransferDisconnected internal constructor() : BleException()
     class FileTransferInvalidData internal constructor() : BleException()
+    class FileTransferInvalidInternalState internal constructor() : BleException()
     // endregion
 }

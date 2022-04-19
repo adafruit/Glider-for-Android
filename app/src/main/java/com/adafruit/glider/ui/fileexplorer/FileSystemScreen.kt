@@ -52,9 +52,7 @@ fun FileSystemScreen(
         }
     }
 
-
     Box(Modifier.fillMaxSize()) {
-
         // Items
         val isRootDirectory by viewModel.isRootDirectory.collectAsState()
         val entries by viewModel.entries.collectAsState()

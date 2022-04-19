@@ -14,7 +14,6 @@ import java.util.*
  * Created by Antonio García (antonio@openroad.es)
  */
 open class FileCommandsViewModel : ViewModel() {
-
     // Params
     var showOnlyDirectories = false
 
@@ -107,7 +106,6 @@ open class FileCommandsViewModel : ViewModel() {
                         )
                     }
                 },
-
                 onFailure = { exception ->
                     log.warning("makeDirectory $path error: $exception")
                     _lastTransmit.update {
