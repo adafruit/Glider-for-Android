@@ -425,6 +425,7 @@ class BleFileTransferPeripheral(
 
         val data = byteArrayOf(0x40, 0x00) +
                 pathSize.toByteArray16bit() +
+                byteArrayOf(0x00, 0x00, 0x00, 0x00) +      // 4 bytes padding
                 timestamp.toByteArray64bit() +
                 path.toByteArray()
 
@@ -584,7 +585,7 @@ class BleFileTransferPeripheral(
             val status = data[decodingOffset]
             val isStatusOk = status == 0x01.toByte()
 
-            decodingOffset = 4
+            decodingOffset = 4      // Skip padding
             val offset = data.readInt32(4)
             decodingOffset += 4
             val truncatedTime = data.readLong64(decodingOffset)
