@@ -13,7 +13,7 @@ import java.util.*
 /**
  * Created by Antonio García (antonio@openroad.es)
  */
-open class FileCommandsViewModel() : ViewModel() {
+open class FileCommandsViewModel : ViewModel() {
 
     // Params
     var showOnlyDirectories = false
@@ -226,7 +226,6 @@ open class FileCommandsViewModel() : ViewModel() {
                         }
                         completion?.let { it(Result.success(date)) }
                     },
-
                     onFailure = { exception ->
                         log.warning("writeFile $filename error: $exception")
                         _lastTransmit.update {

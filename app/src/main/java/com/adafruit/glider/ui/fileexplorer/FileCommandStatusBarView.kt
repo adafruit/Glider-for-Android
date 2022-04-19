@@ -62,11 +62,9 @@ fun FileCommandStatusBarView(
                     backgroundColor = Color.Transparent
                 )
             }
-
         }
     }
 }
-
 
 // region Previews
 @Preview

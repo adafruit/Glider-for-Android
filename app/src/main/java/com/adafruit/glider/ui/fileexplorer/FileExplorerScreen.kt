@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +21,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
+import com.adafruit.glider.BuildConfig
 import com.adafruit.glider.ui.BackgroundGradientDefault
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.TabBackground
@@ -36,14 +38,49 @@ fun FileExplorerScaffoldingScreen(
     onFileSelected: (String) -> Unit,
 ) {
     val navController = rememberNavController()
+    val isInfoOpen = remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("File Explorer") }, backgroundColor = TopBarBackground
+                title = { Text("File Explorer") },
+                backgroundColor = TopBarBackground,
+                actions = {
+                    IconButton(onClick = { isInfoOpen.value = true }) {
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = "Info"
+                        )
+                    }
+                }
             )
         },
     ) { innerPadding ->
         FileExplorerScreen(innerPadding, onFileSelected = onFileSelected)
+
+        // Info dialog
+        if (isInfoOpen.value) {
+
+            AlertDialog(
+                onDismissRequest = { isInfoOpen.value = false },
+                contentColor = Color.Black,
+                title = { Text("Info") },
+                text = {
+                    Text("Version: ${BuildConfig.VERSION_NAME} b${BuildConfig.VERSION_CODE}")
+                },
+                confirmButton = {
+                    OutlinedButton(
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Color.Black
+                        ),
+                        border = BorderStroke(1.dp, TabBackground),
+                        onClick = {
+                            isInfoOpen.value = false
+                        }) {
+                        Text("Ok")
+                    }
+                }
+            )
+        }
     }
 }
 
