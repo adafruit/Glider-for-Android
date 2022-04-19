@@ -50,15 +50,18 @@ fun FileCommandStatusBarView(
 
         // Progress
         transmissionProgress?.let {
-            val progress = it.transmittedBytes.toFloat() / (it.totalBytes?.toFloat() ?: 0f)
-            LinearProgressIndicator(
-                progress,
-                Modifier
-                    .fillMaxWidth()
-                    .height(4.dp),
-                color = AccentMain,
-                backgroundColor = Color.Transparent
-            )
+            val totalBytes = it.totalBytes?.toFloat()
+            if (totalBytes != null) {
+                val progress = it.transmittedBytes.toFloat() / (it.totalBytes?.toFloat() ?: 1f)
+                LinearProgressIndicator(
+                    progress,
+                    Modifier
+                        .fillMaxWidth()
+                        .height(4.dp),
+                    color = AccentMain,
+                    backgroundColor = Color.Transparent
+                )
+            }
 
         }
     }

@@ -9,6 +9,8 @@ data class TransmissionProgress(
     var description: String,
     var transmittedBytes: Int = 0,
     var totalBytes: Int? = null,
+
+
 )
 
 data class TransmissionLog(

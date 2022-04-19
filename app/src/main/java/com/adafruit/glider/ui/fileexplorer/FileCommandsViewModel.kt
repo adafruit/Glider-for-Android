@@ -155,8 +155,11 @@ open class FileCommandsViewModel() : ViewModel() {
         _isTransmitting.update { true }
 
         fileTransferClient.readFile(filePath, progress = { transmittedBytes, totalBytes ->
-            _transmissionProgress.value?.transmittedBytes = transmittedBytes
-            _transmissionProgress.value?.totalBytes = totalBytes
+            val newProgress = transmissionProgress.value?.copy(
+                transmittedBytes = transmittedBytes,
+                totalBytes = totalBytes
+            )
+            _transmissionProgress.update { newProgress }
         }, completion = { result ->
             _isTransmitting.update { false }
 
@@ -203,8 +206,11 @@ open class FileCommandsViewModel() : ViewModel() {
             path = filename,
             data = data,
             progress = { transmittedBytes, totalBytes ->
-                _transmissionProgress.value?.transmittedBytes = transmittedBytes
-                _transmissionProgress.value?.totalBytes = totalBytes
+                val newProgress = transmissionProgress.value?.copy(
+                    transmittedBytes = transmittedBytes,
+                    totalBytes = totalBytes
+                )
+                _transmissionProgress.update { newProgress }
             },
             completion = { result ->
                 _isTransmitting.update { false }

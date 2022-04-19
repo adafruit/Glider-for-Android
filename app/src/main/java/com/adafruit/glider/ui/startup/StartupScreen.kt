@@ -17,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
@@ -39,6 +40,7 @@ fun StartupScreen(
 ) {
     // UI State
     val uiState by viewModel.uiState.collectAsState()
+    val isRestoringConnection = uiState == StartupViewModel.StartupUiState.Reconnecting
 
     // Navigation
     when (uiState) {
@@ -78,6 +80,12 @@ fun StartupScreen(
                     painter = painterResource(R.drawable.glider_logo),
                     contentDescription = "Glider logo",
                 )
+
+                Text(
+                    "Restoring Connection...",
+                    Modifier.alpha(if (isRestoringConnection) 1.0f else 0.0f)
+                )
+
                 CircularProgressIndicator()
                 //BluetoothState()
             }
