@@ -23,9 +23,6 @@ class AppContainer(context: Context) {
     init {
         val bleStateDataSource = BleStateDataSource(context)
         bleStateRepository = BleStateRepository(bleStateDataSource, MainScope())
-
-
     }
-
 }
 

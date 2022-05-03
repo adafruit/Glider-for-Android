@@ -32,7 +32,7 @@ class StartupViewModel : ViewModel() {
 
         FileTransferConnectionManager.reconnect { isConnected ->
 
-            log.info("Startup finished")
+            log.info("Startup finished. Connected: $isConnected")
             _uiState.value = StartupUiState.Finished
         }
     }

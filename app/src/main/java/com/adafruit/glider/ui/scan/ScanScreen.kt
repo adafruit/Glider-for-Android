@@ -14,7 +14,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -33,7 +35,9 @@ import com.adafruit.glider.ui.BackgroundGradientDefault
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.TopBarBackground
 import com.adafruit.glider.utils.observeAsState
+import io.openroad.ble.BleManager
 import io.openroad.ble.FileTransferClient
+import io.openroad.ble.applicationContext
 import io.openroad.ble.filetransfer.BleFileTransferPeripheral
 
 @Composable
@@ -141,7 +145,9 @@ private fun ScanBody(
                                 getFileTransferPeripheralsScannedText(
                                     numMatchingDevicesOutOfRangeFound
                                 ),
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .alpha(if (numMatchingDevicesOutOfRangeFound > 0) 1f else 0f),
                                 textAlign = TextAlign.Center,
                                 color = Color.Gray,
                             )
@@ -169,6 +175,29 @@ private fun ScanBody(
                 Text("[Debug] Found: $numDevicesFound devices")
                 Text("[Debug] Matching: $numMatchingDevicesInRangeFound devices")
             }
+
+            Spacer(Modifier.weight(1f))
+
+
+            // Force remove paired devices
+            val bondedDevices = BleManager.getPairedPeripherals(applicationContext)
+            if (bondedDevices?.isEmpty() == false) {
+                val mainColor = Color.White.copy(alpha = 0.7f)
+                OutlinedButton(
+                    modifier = Modifier.align(CenterHorizontally),
+                    colors = ButtonDefaults.textButtonColors(
+                        backgroundColor = Color.Transparent,
+                        contentColor = mainColor,
+                        disabledContentColor = Color.Gray,
+                    ),
+                    border = BorderStroke(1.dp, mainColor),
+                    onClick = {
+                        BleManager.removeAllPairedPeripheralInfo(applicationContext)
+                    }) {
+                    Text("Remove paired peripherals info", style = MaterialTheme.typography.caption)
+                }
+            }
+
         }
     }
 }

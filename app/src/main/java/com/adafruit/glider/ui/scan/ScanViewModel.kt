@@ -7,10 +7,9 @@ package com.adafruit.glider.ui.scan
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.adafruit.glider.BuildConfig
-import io.openroad.ble.BleManager
-import io.openroad.ble.applicationContext
+import com.adafruit.glider.utils.launchPeriodicAsync
 import io.openroad.ble.filetransfer.BleFileTransferPeripheral
+import io.openroad.ble.filetransfer.FileTransferConnectionManager
 import io.openroad.ble.filetransfer.kFileTransferServiceUUID
 import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.ble.scanner.BlePeripheralScanner
@@ -36,10 +35,12 @@ class ScanViewModel(
         object Connected : ScanUiState()
         object Discovering : ScanUiState()
         object SetupFileTransfer : ScanUiState()
-        object Bonding: ScanUiState()
+        object Bonding : ScanUiState()
 
         //data class FileTransferError(val cause: Throwable) : ScanUiState()
-        data class FileTransferEnabled(val fileTransferPeripheral: BleFileTransferPeripheral) : ScanUiState()
+        data class FileTransferEnabled(val fileTransferPeripheral: BleFileTransferPeripheral) :
+            ScanUiState()
+
         data class FileTransferError(val gattErrorCode: Int) : ScanUiState()
         data class Disconnected(val cause: Throwable?) : ScanUiState()
     }
@@ -49,6 +50,7 @@ class ScanViewModel(
     private val log by LogUtils()
     private var scannerStartingTime = System.currentTimeMillis()
     private var autoConnectJob: Job? = null
+    private var reconnectJob: Job? = null
     private var stoppingScannerDelayBeforeConnectingJob: Job? = null
     private var fileTransferPeripheralStateJob: Job? = null
 
@@ -72,13 +74,13 @@ class ScanViewModel(
         .map { blePeripherals ->
             // Only peripherals that are manufactured by Adafruit and include theFileTransfer service
             blePeripherals
-
-            .map {
-                log.info("found: ${it.nameOrAddress} -> rssi: ${it.rssi.value}")
-                it
-            }
+                /*.map {
+                    log.info("found: ${it.nameOrAddress} -> rssi: ${it.rssi.value}")
+                    it
+                }*/
                 .filter {
-                    it.scanRecord()?.isManufacturerAdafruit() ?: false }
+                    it.scanRecord()?.isManufacturerAdafruit() ?: false
+                }
                 .filter {
                     val serviceUuids: List<UUID>? = it.scanRecord()?.serviceUuids?.map { it.uuid }
                     serviceUuids?.contains(kFileTransferServiceUUID) ?: false
@@ -98,7 +100,6 @@ class ScanViewModel(
     val numMatchingPeripheralsInRangeFound = matchingPeripheralsFound
         .map { it.filter { it.rssi.value > kMinRssiToAutoConnect }.size }
 
-
     // region Lifecycle
     init {
         // Listen to scanning errors and map it to the UI state
@@ -115,27 +116,10 @@ class ScanViewModel(
         // Start scanning if we are in the scanning state
         if (uiState.value == ScanUiState.Scanning) {
 
-            // Force remove bonding information
-            if (BuildConfig.DEBUG || true) {
-                try {
-                    val bondedDevices = BleManager.getBluetoothAdapter(applicationContext)?.bondedDevices
-                    log.info("Bound devices: $bondedDevices")
-
-                    bondedDevices?.forEach { device ->
-                        try {
-                            val method = device.javaClass.getMethod("removeBond")
-                            val result = method.invoke(device) as Boolean
-                            if (result) {
-                                log.info("Successfully removed bond")
-                            }
-                        } catch (e: Exception) {
-                            log.info("ERROR: could not remove bond: $e")
-                        }
-
-                    }
-                } catch (ignored: SecurityException) {
-                }
-            }
+            /*if (BuildConfig.DEBUG || true) {
+                // Force remove bonding information
+                BleManager.removeAllBondedDevices()
+            }*/
 
             // Start scanning
             startScanning()
@@ -183,11 +167,32 @@ class ScanViewModel(
             }
             .flowOn(defaultDispatcher)
             .launchIn(viewModelScope)
+
+        // Start a job for reconnection to previously bonded devices
+        reconnectJob?.cancel()
+        reconnectJob = viewModelScope.launchPeriodicAsync(10000) {
+            if (uiState.value == ScanUiState.Scanning) {
+                log.info("Scan from known peripherals (reconnect)")
+                FileTransferConnectionManager.reconnect { isConnected ->
+                    if (isConnected) {
+                        FileTransferConnectionManager.selectedFileTransferClient.value?.bleFileTransferPeripheral?.let { fileTransferPeripheral ->
+                            log.info("Scan reconnected to known peripheral")
+                            stopScanning()
+                            _uiState.update { ScanUiState.FileTransferEnabled(fileTransferPeripheral) }
+                        }
+                    }
+                }
+            }
+        }
     }
+
 
     private fun stopScanning() {
         autoConnectJob?.cancel()
         autoConnectJob = null
+
+        reconnectJob?.cancel()
+        reconnectJob = null
 
         blePeripheralScanner.stop()
     }
@@ -213,11 +218,9 @@ class ScanViewModel(
     private suspend fun connect(blePeripheral: BlePeripheral) {
         // Create a BleFileTransferPeripheral
         val fileTransferPeripheral = BleFileTransferPeripheral(blePeripheral)
-        //val fileTransferClient = FileTransferClient(blePeripheral)
 
         // Link state changes with UI
         fileTransferPeripheralStateJob = viewModelScope.launch {
-            //fileTransferPeripheral.fileTransferState
             fileTransferPeripheral.fileTransferState
                 .onCompletion { exception ->
                     log.info("fileTransferPeripheralStateJob onCompletion: $exception")

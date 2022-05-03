@@ -8,9 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -22,7 +20,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.adafruit.glider.GliderApplication
 import com.adafruit.glider.R
 import com.adafruit.glider.ui.fileexplorer.FileEditScaffoldingScreen
 import com.adafruit.glider.ui.fileexplorer.FileExplorerScaffoldingScreen
@@ -33,7 +30,6 @@ import com.adafruit.glider.utils.observeAsState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.openroad.ble.BleManager
-import io.openroad.ble.applicationContext
 import io.openroad.ble.filetransfer.FileTransferConnectionManager
 
 // region Lifecycle
@@ -92,7 +88,8 @@ fun GliderNavHost(
     }
 
     // Check Bluetooth-related permissions state
-    val bluetoothPermissionState = rememberMultiplePermissionsState(BleManager.getNeededPermissions())
+    val bluetoothPermissionState =
+        rememberMultiplePermissionsState(BleManager.getNeededPermissions())
     val isInitialPermissionsCheckInProgress =
         !bluetoothPermissionState.allPermissionsGranted && currentScreen == ScreenRoute.Startup && !bluetoothPermissionState.shouldShowRationale
 
@@ -108,6 +105,14 @@ fun GliderNavHost(
         }
     }
 
+    // Check connection status
+    val isAnyPeripheralConnectingOrConnected by FileTransferConnectionManager.isAnyPeripheralConnectingOrConnected.collectAsState()
+    LaunchedEffect(isAnyPeripheralConnectingOrConnected, currentScreen.route) {
+        if (!isAnyPeripheralConnectingOrConnected && currentScreen == ScreenRoute.ConnectedTab) {
+            navController.navigate(ScreenRoute.Scan.route)
+        }
+    }
+
     // NavHost
     NavHost(
         navController = navController,
@@ -118,7 +123,8 @@ fun GliderNavHost(
         composable(ScreenRoute.Startup.route) {
             StartupScreen(isInitialPermissionsCheckInProgress) {
                 // on finish startup
-                val reconnectedFileTransferClient = FileTransferConnectionManager.selectedFileTransferClient.value
+                val reconnectedFileTransferClient =
+                    FileTransferConnectionManager.selectedFileTransferClient.value
                 val screenRoute = if (reconnectedFileTransferClient != null) {
                     ScreenRoute.ConnectedTab
                 } else {
@@ -145,6 +151,9 @@ fun GliderNavHost(
                 val appContainer = (applicationContext as GliderApplication).appContainer
                 appContainer.fileTransferClient = fileTransferClient        // TODO: clean this. it should be in appContainer
                 */
+                FileTransferConnectionManager.addPeripheralToAutomaticallyManagedConnection(
+                    fileTransferPeripheral
+                )
                 FileTransferConnectionManager.setSelectedPeripheral(fileTransferPeripheral)
 
                 navController.navigate(ScreenRoute.ConnectedTab.route) {

@@ -35,7 +35,8 @@ data class BleConnectionException internal constructor(
 ) : BleException("Connection failed. Status: $status")
 
 class BleDiscoveryException internal constructor() : BleException()
-
+class BleTimeoutException internal constructor() : BleException()
+class BleDisconnectedWhileWaitingForCommandException internal constructor() : BleException("Disconnected while waiting for operation")
 
 data class BleStatusResultException internal constructor(
     val status: Int,

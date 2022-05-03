@@ -11,17 +11,18 @@ import java.util.*
 
 typealias ProgressHandler = (transmittedBytes: Int, totalBytes: Int) -> Unit
 
-class FileTransferClient(private val bleFileTransferPeripheral: BleFileTransferPeripheral) {
+class FileTransferClient(val bleFileTransferPeripheral: BleFileTransferPeripheral) {
 
     constructor(blePeripheral: BlePeripheral) : this(BleFileTransferPeripheral(blePeripheral))
 
-    //private val fileTransferPeripheral: BleFileTransferPeripheral = BleFileTransferPeripheral(blePeripheral)
+    val address = bleFileTransferPeripheral.address
+
     val fileTransferState = bleFileTransferPeripheral.fileTransferState
 
     val peripheralName = bleFileTransferPeripheral.nameOrAddress
 
-    fun connectAndSetup(completion: BlePeripheralConnectCompletionHandler) {
-        bleFileTransferPeripheral.connectAndSetup(completion)
+    fun connectAndSetup(connectionTimeout: Int? = null, completion: BlePeripheralConnectCompletionHandler) {
+        bleFileTransferPeripheral.connectAndSetup(connectionTimeout, completion)
     }
 
     // region File Transfer Commands
@@ -69,7 +70,6 @@ class FileTransferClient(private val bleFileTransferPeripheral: BleFileTransferP
     ) {
         bleFileTransferPeripheral.makeDirectory(path, completion)
     }
-
 
     /**
     Lists all of the contents in a directory given a full path. Returned paths are relative to the given path to reduce duplication

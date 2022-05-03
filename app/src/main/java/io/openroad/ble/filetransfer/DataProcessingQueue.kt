@@ -53,7 +53,7 @@ class DataProcessingQueue {
         val isDataAvailable = data.size() > 0
         val isStillUnprocessedDataInQueue = processedDataCount > 0  && isDataAvailable
         if (isStillUnprocessedDataInQueue) {
-            log.info("Unprocessed data still in queue ${data.size()} bytes). Try to process next packet")
+            //log.info("Unprocessed data still in queue ${data.size()} bytes). Try to process next packet")
             processQueuedChunks(processingHandler)
         }
         else if (!isDataAvailable) {

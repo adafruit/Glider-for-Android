@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
 import androidx.annotation.MainThread
 import com.adafruit.glider.BuildConfig
+import io.openroad.ble.BleDisconnectedWhileWaitingForCommandException
 import io.openroad.ble.BleDiscoveryException
 import io.openroad.ble.BleException
 import io.openroad.ble.BleStatusResultException
@@ -30,7 +31,7 @@ val kFileTransferVersionCharacteristicUUID: UUID =
     UUID.fromString("ADAF0100-4669-6C65-5472-616E73666572")
 val kFileTransferDataCharacteristicUUID: UUID =
     UUID.fromString("ADAF0200-4669-6C65-5472-616E73666572")
-val kFileTransferDebugMessagesEnabled = BuildConfig.DEBUG && true
+val kFileTransferDebugMessagesEnabled = BuildConfig.DEBUG && false
 
 typealias FileTransferDataHandler = (data: ByteArray) -> Unit
 typealias FileTransferProgressHandler = (transmittedBytes: Int, totalBytes: Int) -> Unit
@@ -51,7 +52,9 @@ class BleFileTransferPeripheral(
 
     // Data - Private
     private val log by LogUtils()
+    val address = blePeripheral.address
     val nameOrAddress = blePeripheral.nameOrAddress
+    val connectionState = blePeripheral.connectionState
 
     private var fileTransferVersion: Int? = null
     private var dataProcessingQueue = DataProcessingQueue()
@@ -131,7 +134,7 @@ class BleFileTransferPeripheral(
                             FileTransferState.Disconnecting(connectionState.cause)
                         }
                         is BlePeripheral.ConnectionState.Disconnected -> _fileTransferState.update {
-                            cleanCachedState()
+                            disable()
                             FileTransferState.Disconnected(connectionState.cause)
                         }
                     }
@@ -151,12 +154,16 @@ class BleFileTransferPeripheral(
     // region Actions
 
     @MainThread
-    fun connectAndSetup(completion: BlePeripheralConnectCompletionHandler) {
-        cleanCachedState()
+    fun connectAndSetup(
+        connectionTimeout: Int? = null,
+        completion: BlePeripheralConnectCompletionHandler
+    ) {
+        disable()
 
         setupCompletionHandler = null
+        _fileTransferState.update { FileTransferState.Start }
         // Connects using the standard connect function but the state changes will be collected to trigger the next steps in the FileTransfer setup
-        blePeripheral.connect { isConnected ->
+        blePeripheral.connect(connectionTimeout = connectionTimeout) { isConnected ->
             // if connected, wait to call completion until setup has finished
             if (isConnected) {
                 setupCompletionHandler = completion
@@ -166,9 +173,63 @@ class BleFileTransferPeripheral(
         }
     }
 
-    private fun cleanCachedState() {
+    private fun disable() {
+        log.info("disable $nameOrAddress")
+
+        // Clear all internal data
         fileTransferVersion = null
         setupCompletionHandler = null
+
+        dataProcessingQueue.reset()
+
+        readStatus?.completion?.let {
+            it(
+                Result.failure(
+                    BleDisconnectedWhileWaitingForCommandException()
+                )
+            )
+        }
+        readStatus = null
+        writeStatus?.completion?.let {
+            it(
+                Result.failure(
+                    BleDisconnectedWhileWaitingForCommandException()
+                )
+            )
+        }
+        writeStatus = null
+        deleteStatus?.completion?.let {
+            it(
+                Result.failure(
+                    BleDisconnectedWhileWaitingForCommandException()
+                )
+            )
+        }
+        deleteStatus = null
+        listDirectoryStatus?.completion?.let {
+            it(
+                Result.failure(
+                    BleDisconnectedWhileWaitingForCommandException()
+                )
+            )
+        }
+        listDirectoryStatus = null
+        makeDirectoryStatus?.completion?.let {
+            it(
+                Result.failure(
+                    BleDisconnectedWhileWaitingForCommandException()
+                )
+            )
+        }
+        makeDirectoryStatus = null
+        moveStatus?.completion?.let {
+            it(
+                Result.failure(
+                    BleDisconnectedWhileWaitingForCommandException()
+                )
+            )
+        }
+        moveStatus = null
     }
 
     private fun discoverServicesAndEnableFileTransfer() {
@@ -306,7 +367,7 @@ class BleFileTransferPeripheral(
         log.info("Write file $path")
 
         if (writeStatus != null) {
-            log.warning("Warning: concurrent readFile")
+            log.warning("Warning: concurrent writeFile")
         }
 
         writeStatus = WriteStatus(data = data, progress = progress, completion = completion)
@@ -320,8 +381,8 @@ class BleFileTransferPeripheral(
                 pathSize.toByteArray16bit() +
                 offset.toByteArray32bit() +
                 timestamp.toByteArray64bit() +
-                totalSize.toByteArray32bit()
-        path.toByteArray()
+                totalSize.toByteArray32bit() +
+                path.toByteArray()
 
         sendCommand(commandData) { result ->
             if (completion != null) {
@@ -492,7 +553,7 @@ class BleFileTransferPeripheral(
 
         val command = data[0]
 
-        log.info("received command: ${command.toHexString()}")
+        //log.info("received command: ${command.toHexString()}")
 
         bytesProcessed = when (command) {
             0x11.toByte() -> decodeReadFile(data)

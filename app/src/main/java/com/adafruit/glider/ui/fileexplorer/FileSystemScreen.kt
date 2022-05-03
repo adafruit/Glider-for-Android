@@ -1,5 +1,7 @@
 package com.adafruit.glider.ui.fileexplorer
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,10 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DriveFolderUpload
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.InsertDriveFile
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,7 +19,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adafruit.glider.ui.BackgroundGradientDefault
+import com.adafruit.glider.ui.theme.BackgroundGradientStart
+import com.adafruit.glider.ui.theme.ButtonWarningBackground
 import com.adafruit.glider.ui.theme.GliderTheme
+import com.adafruit.glider.ui.theme.TabBackground
+import com.adafruit.glider.utils.ButtonWithLongPress
+import com.adafruit.glider.utils.gesturesDisabled
 import io.openroad.ble.filetransfer.BleFileTransferPeripheral
 import io.openroad.ble.filetransfer.FileTransferConnectionManager
 import io.openroad.ble.utils.upPath
@@ -29,6 +33,7 @@ import io.openroad.ble.utils.upPath
  * Created by Antonio García (antonio@openroad.es)
  */
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FileSystemScreen(
     path: String,
@@ -52,13 +57,21 @@ fun FileSystemScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier
+            .gesturesDisabled(isLoading)
+            .fillMaxSize()
+    ) {
         // Items
         val isRootDirectory by viewModel.isRootDirectory.collectAsState()
         val entries by viewModel.entries.collectAsState()
+        val actionDialogEntry =
+            remember { mutableStateOf<BleFileTransferPeripheral.DirectoryEntry?>(null) }
+        val renameDialogEntry =
+            remember { mutableStateOf<BleFileTransferPeripheral.DirectoryEntry?>(null) }
 
-        val state = rememberScrollState()
-        Column(modifier = Modifier.verticalScroll(state)) {
+        val scrollState = rememberScrollState()
+        Column(modifier = Modifier.verticalScroll(scrollState)) {
             if (!isRootDirectory) {
                 //item {
                 Button(
@@ -93,15 +106,20 @@ fun FileSystemScreen(
                         FileRow(
                             name = entry.name,
                             size = entry.type.size,
-                            isHidden = entry.isHidden
-                        ) {
-                            // On click
-                            onFileSelected(path + entry.name)
-                        }
+                            isHidden = entry.isHidden,
+                            onLongClick = {
+                                actionDialogEntry.value = entry
+                            },
+                            onClick = {
+                                onFileSelected(path + entry.name)
+                            })
                     }
 
                     is BleFileTransferPeripheral.DirectoryEntry.EntryType.Directory -> {
-                        Button(
+                        ButtonWithLongPress(
+                            onLongClick = {
+                                actionDialogEntry.value = entry
+                            },
                             onClick = {
                                 val newPath = path + entry.name + "/"
                                 onPathChange(newPath)
@@ -128,6 +146,40 @@ fun FileSystemScreen(
             }
         }
 
+        // Actions dialog
+        fileTransferClient.value?.let { fileTransferClient ->
+            actionDialogEntry.value?.let { entry ->
+                ActionDialog(
+                    onRename = {
+                        actionDialogEntry.value = null
+                        renameDialogEntry.value = entry
+                    },
+                    onMove = {
+                        actionDialogEntry.value = null
+                        /*TODO*/
+                    },
+                    onDelete = {
+                        actionDialogEntry.value = null
+                        viewModel.delete(entry, fileTransferClient) {}
+                    },
+                    onDismiss = { actionDialogEntry.value = null })
+            }
+
+
+            renameDialogEntry.value?.let { entry ->
+                RenameDialog(name = entry.name,
+                    onConfirm = { filename ->
+                        renameDialogEntry.value = null
+                        val fromPath = viewModel.path.value + entry.name
+                        val toPath = viewModel.path.value + filename
+                        viewModel.renameFile(fromPath, toPath, fileTransferClient)
+                    }, onDismiss = {
+                        renameDialogEntry.value = null
+                    })
+            }
+        }
+
+        // Empty View / Wait View
         Column(
             modifier = Modifier.align(Alignment.Center),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -142,6 +194,13 @@ fun FileSystemScreen(
             // Wait view
             val isInteractionDisabled = isTransmitting || isLoading
             if (isInteractionDisabled) {
+                /*
+                // Disable interactions
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {})*/
+                // Show progress
                 CircularProgressIndicator()
             }
         }
@@ -149,13 +208,144 @@ fun FileSystemScreen(
 }
 
 @Composable
+private fun RenameDialog(
+    name: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var inputText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        contentColor = Color.Black,
+        title = { Text("Rename") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter new name for '$name'")
+                TextField(
+                    colors = TextFieldDefaults.textFieldColors(
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = Color.Black,
+                    ),
+                    value = inputText,
+                    onValueChange = { inputText = it },
+                )
+            }
+        },
+        confirmButton = {
+            OutlinedButton(
+                enabled = !inputText.isEmpty(),
+                colors = ButtonDefaults.textButtonColors(
+                    //backgroundColor = mainColor,
+                    contentColor = Color.Black,
+                ),
+                border = BorderStroke(1.dp, TabBackground),
+                onClick = {
+                    onConfirm(inputText)
+                }) {
+                Text("Rename")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                colors = ButtonDefaults.textButtonColors(
+                    //backgroundColor = mainColor,
+                    contentColor = Color.Black
+                ),
+                border = BorderStroke(1.dp, TabBackground),
+                onClick = {
+                    onDismiss()
+                }) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ActionDialog(
+    onRename: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        contentColor = Color.Black,
+        title = { Text("Available actions:") },
+        buttons = {
+            Column(
+                Modifier
+                    .width(IntrinsicSize.Max)
+                    .padding(12.dp)
+                    .defaultMinSize(minWidth = 200.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onRename() },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = BackgroundGradientStart)
+                ) {
+                    /* Icon(
+                         tint = Color.White,
+                         imageVector = Icons.Outlined.DriveFileRenameOutline,
+                         contentDescription = null,
+                         modifier = Modifier.padding(end = 4.dp)
+                     )*/
+
+                    Text("Rename", color = Color.White)
+                }
+
+                /*
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onMove() },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = BackgroundGradientStart)
+                ) {
+                    /* Icon(
+                         tint = Color.White,
+                         imageVector = Icons.Outlined.DriveFileMove,
+                         contentDescription = null,
+                         modifier = Modifier.padding(end = 4.dp)
+                     )*/
+
+                    Text("Move", color = Color.White)
+                }*/
+
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onDelete() },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = ButtonWarningBackground)
+                ) {
+                    /*
+                        Icon(
+                            tint = Color.White,
+                            imageVector = Icons.Outlined.DeleteForever,
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )*/
+
+                    Text("Delete", color = Color.White)
+
+                }
+            }
+        }
+    )
+}
+
+@Composable
 private fun FileRow(
     name: String,
     size: Int,
     isHidden: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
-    Button(
+    ButtonWithLongPress(
+        onLongClick = {
+            onLongClick()
+        },
         onClick = { onClick() },
         colors = ButtonDefaults.textButtonColors(
             backgroundColor = Color.Transparent,
@@ -204,9 +394,10 @@ private fun ItemRow(imageVector: ImageVector, imageDescription: String, name: St
 // region Previews
 @Preview(showSystemUi = true)
 @Composable
-private fun ConnectedTabScreenPreview() {
+private fun FileSystemScreenPreview() {
     GliderTheme {
         BackgroundGradientDefault {
+
             FileSystemScreen(
                 path = "/",
                 onPathChange = {},

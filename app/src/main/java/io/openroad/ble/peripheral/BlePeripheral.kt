@@ -40,7 +40,7 @@ internal val kClientCharacteristicConfigUUID =
 // -    Sets a identifier for each command and verifies that the command processed is the one expected
 private val kDebugCommands = BuildConfig.DEBUG && true
 
-// TypeAllias
+// TypeAlias
 typealias BlePeripheralConnectCompletionHandler = (isConnected: Boolean) -> Unit
 
 // -    Debug timeouts from commands
@@ -69,6 +69,7 @@ open class BlePeripheral(
 
     // Data - Private
     private val log by LogUtils()
+    private var shouldRetryConnection = true
 
     //private var _runningRssi: Int? = null       // Backing variable for rssi
     var mtuSize: Int = kDefaultMtuSize; private set
@@ -104,6 +105,8 @@ open class BlePeripheral(
                 }
             }
         }
+
+        fun isConnectingOrConnected() = this == Connecting || this == Connected
     }
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Start)
@@ -117,6 +120,8 @@ open class BlePeripheral(
             throw BleInvalidStateException()
         }
     }
+
+    var connectionTimeoutTimer: Timer? = null
 
     // Data - Bonding information
     private val _bondingState = MutableStateFlow(BleBondState.Unknown)
@@ -216,7 +221,11 @@ open class BlePeripheral(
     // TODO: convert connection and gattCallback to use Kotlin flows
     @SuppressLint("MissingPermission")
     @MainThread
-    fun connect(completion: BlePeripheralConnectCompletionHandler) {
+    fun connect(
+        shouldRetryConnection: Boolean = true,
+        connectionTimeout: Int? = null,
+        completion: BlePeripheralConnectCompletionHandler
+    ) {
         // Confirm that ble state is enabled
         if (!BleManager.confirmBleState(requiredState = BleState.Enabled)) {
             _connectionState.update { ConnectionState.Disconnected(BleInvalidStateException()) }
@@ -224,6 +233,7 @@ open class BlePeripheral(
             return
         }
 
+        /*
         // Confirm that is disconnected before starting connection (because it can already be connected)
         if (!confirmConnectionState(requiredConnectionState = ConnectionState.Start)) {
             _connectionState.update {
@@ -231,7 +241,13 @@ open class BlePeripheral(
             }
             completion(false)
             return
+        }*/
+        if (connectionState.value == ConnectionState.Connected || connectionState.value == ConnectionState.Connecting) {
+            log.warning("Connect called when already connecting or connected")
+            completion(false)
+            return
         }
+        _connectionState.update { ConnectionState.Start }
 
         // Setup connection handler
         val thread = HandlerThread("BlePeripheral_${nameOrAddress}").apply { start() }
@@ -265,6 +281,7 @@ open class BlePeripheral(
         }
 
         // Start connection attempts
+        this.shouldRetryConnection = shouldRetryConnection
         reconnectionAttempts = 0
         commandQueue.clear()
         _connectionState.update { ConnectionState.Connecting }
@@ -290,6 +307,17 @@ open class BlePeripheral(
             }
             return
             //throw BleException("connectGatt returns null")
+        }
+
+        // Create timeout if needed
+        if (connectionTimeout != null) {
+            connectionTimeoutTimer = Timer()
+            connectionTimeoutTimer?.schedule(object : TimerTask() {
+                override fun run() {
+                    log.info("Connection timeout fired")
+                    disconnect(BleTimeoutException())
+                }
+            }, connectionTimeout.toLong())
         }
 
         // Wait for connection status in gattCallback
@@ -712,9 +740,13 @@ open class BlePeripheral(
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     when (newState) {
                         BluetoothProfile.STATE_CONNECTED -> {
+                            connectionTimeoutTimer?.cancel()
+                            connectionTimeoutTimer = null
+
                             log.info("Connection state changed: CONNECTED")
                             _connectionState.update { ConnectionState.Connected }
                             connectionCompletionHandler?.let { it(true) }
+                            connectionCompletionHandler = null
                         }
                         BluetoothProfile.STATE_DISCONNECTED -> {
                             log.info("Connection state changed: DISCONNECTED")
@@ -724,9 +756,14 @@ open class BlePeripheral(
                             log.info("Connection state changed to: $newState (status: $status)")
                         }
                     }
-                } else {      // Error
+                } /*else if (_bondingState.value == BleBondState.Bonded) {
+                    log.info("Connection status error $status for bonded peripheral. Abort because it possible is out-of-range or not powered on")
+                    connectionFinished(BleConnectionException(status))
+                }*/
+                else {      // Error
                     log.info("Connection status error $status")
-                    if (status == 133 && newState == BluetoothProfile.STATE_DISCONNECTED && reconnectionAttempts < 2) {     // Error. Try to connect again https://medium.com/@martijn.van.welie/making-android-ble-work-part-2-47a3cdaade07
+
+                    if (shouldRetryConnection && status == 133 && newState == BluetoothProfile.STATE_DISCONNECTED && reconnectionAttempts < 2) {     // Error. Try to connect again https://medium.com/@martijn.van.welie/making-android-ble-work-part-2-47a3cdaade07
                         reconnectionAttempts++
                         log.info("Connection error. Trying to reconnect... (Attempt $reconnectionAttempts)")
 
@@ -754,6 +791,9 @@ open class BlePeripheral(
                                 handler
                             )
                     } else {
+                        connectionTimeoutTimer?.cancel()
+                        connectionTimeoutTimer = null
+
                         connectionFinished(BleConnectionException(status))
                     }
                 }
@@ -801,7 +841,7 @@ open class BlePeripheral(
             characteristic: BluetoothGattCharacteristic
         ) {
             super.onCharacteristicChanged(gatt, characteristic)
-            //log.info("onCharacteristicChanged. numCaptureReadHandlers: " + captureReadHandlers.size)
+            log.info("onCharacteristicChanged. numCaptureReadHandlers: " + captureReadHandlers.size)
             val identifier: String = getCharacteristicIdentifier(characteristic)
             val status =
                 BluetoothGatt.GATT_SUCCESS // On Android, there is no error reported for this callback, so we assume it is SUCCESS
@@ -828,7 +868,7 @@ open class BlePeripheral(
 
                 // Send result
                 val value = characteristic.value
-                log.info("onCharacteristicChanged: send result to captureReadHandler:" + value.toHexString())
+                //log.info("onCharacteristicChanged: send result to captureReadHandler:" + value.toHexString())
                 captureReadHandler.result(status, value)
                 isNotifyOmitted = captureReadHandler.isNotifyOmitted
             }
@@ -836,7 +876,7 @@ open class BlePeripheral(
             // Notify
             if (!isNotifyOmitted) {
                 val notifyHandler = notifyHandlers[identifier]
-                log.info("onCharacteristicChanged. notify: ${if (notifyHandler == null) "no" else "yes"}")
+                //log.info("onCharacteristicChanged. notify: ${if (notifyHandler == null) "no" else "yes"}")
                 notifyHandler?.let { it(status) }
             }
 
@@ -984,8 +1024,6 @@ open class BlePeripheral(
         timeoutAction: TimeoutAction?,
         val isNotifyOmitted: Boolean = false
     ) {
-        // Constants
-
         // Data
         private val log by LogUtils()
         var timeoutTimer: Timer? = null

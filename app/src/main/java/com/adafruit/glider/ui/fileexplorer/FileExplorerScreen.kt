@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -27,6 +28,7 @@ import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.TabBackground
 import com.adafruit.glider.ui.theme.TopBarBackground
 import io.openroad.ble.filetransfer.FileTransferConnectionManager
+import java.util.*
 
 /**
  * Created by Antonio García (antonio@openroad.es)
@@ -38,6 +40,7 @@ fun FileExplorerScaffoldingScreen(
     onFileSelected: (String) -> Unit,
 ) {
     val navController = rememberNavController()
+    val scaffoldState = rememberScaffoldState()
     val isInfoOpen = remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
@@ -54,8 +57,13 @@ fun FileExplorerScaffoldingScreen(
                 }
             )
         },
+        scaffoldState = scaffoldState,
     ) { innerPadding ->
-        FileExplorerScreen(innerPadding, onFileSelected = onFileSelected)
+        FileExplorerScreen(
+            innerPadding,
+            snackbarHostState = scaffoldState.snackbarHostState,
+            onFileSelected = onFileSelected
+        )
 
         // Info dialog
         if (isInfoOpen.value) {
@@ -84,20 +92,28 @@ fun FileExplorerScaffoldingScreen(
     }
 }
 
-
 @Composable
 fun FileExplorerScreen(
     innerPadding: PaddingValues,
     viewModel: FileSystemViewModel = viewModel(),
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onFileSelected: (String) -> Unit,
 ) {
-
     val mainColor = Color.White.copy(alpha = 0.7f)
     val fileTransferClient =
         FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
     val peripheralName = fileTransferClient.value?.peripheralName
     var path by remember { mutableStateOf("/") }
-    val isLoading by FileTransferConnectionManager.isSelectedPeripheralReconnecting.collectAsState()
+    val isReconnecting by FileTransferConnectionManager.isSelectedPeripheralReconnecting.collectAsState()
+
+    LaunchedEffect(isReconnecting) {
+        if (isReconnecting) {
+            snackbarHostState.showSnackbar(
+                message = "Reconnecting...",
+                duration = SnackbarDuration.Long
+            )
+        }
+    }
 
     Column(
         Modifier
@@ -124,6 +140,7 @@ fun FileExplorerScreen(
                         backgroundColor = mainColor,
                         contentColor = Color.Black
                     ),
+                    enabled = !isReconnecting,
                     modifier = Modifier.height(IntrinsicSize.Min),
                     contentPadding = PaddingValues(8.dp),
                 ) {
@@ -158,6 +175,8 @@ fun FileExplorerScreen(
                     // Current Path
                     Text(
                         path,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .align(Alignment.CenterVertically)
                             .border(BorderStroke(1.dp, mainColor), RoundedCornerShape(4.dp))
@@ -170,7 +189,8 @@ fun FileExplorerScreen(
                         mainColor = mainColor,
                         buttonIcon = Icons.Outlined.CreateNewFolder,
                         alertText = "New Directory",
-                        alertMessage = "Enter name for the new directory"
+                        alertMessage = "Enter name for the new directory",
+                        enabled = !isReconnecting,
                     ) { inputText ->
                         val newDirectoryPath = viewModel.path.value + inputText
                         fileTransferClient.value?.let { fileTransferClient ->
@@ -182,7 +202,8 @@ fun FileExplorerScreen(
                         mainColor = mainColor,
                         buttonIcon = Icons.Outlined.NoteAdd,
                         alertText = "New File",
-                        alertMessage = "Enter name for the new file"
+                        alertMessage = "Enter name for the new file",
+                        enabled = !isReconnecting,
                     ) { inputText ->
                         val newFilePath = viewModel.path.value + inputText
                         fileTransferClient.value?.let { fileTransferClient ->
@@ -211,7 +232,7 @@ fun FileExplorerScreen(
                     path = path,
                     onPathChange = { path = it },
                     showOnlyDirectories = false,
-                    isLoading = isLoading,
+                    isLoading = isReconnecting,
                     viewModel = viewModel
                 ) { selectedFilePath ->
                     // on file selected
@@ -232,6 +253,7 @@ private fun InputTextActionButton(
     buttonIcon: ImageVector,
     alertText: String,
     alertMessage: String,
+    enabled: Boolean,
     onNewInputText: (String) -> Unit
 ) {
     val isDialogOpen = remember { mutableStateOf(false) }
@@ -239,10 +261,18 @@ private fun InputTextActionButton(
 
     // New Directory
     OutlinedButton(
-        onClick = { isDialogOpen.value = true },
+        onClick = {
+            /*if (BuildConfig.DEBUG) {
+                onNewInputText(UUID.randomUUID().toString())
+            } else {*/
+            isDialogOpen.value = true
+            // }
+        },
+        enabled = enabled,
         colors = ButtonDefaults.textButtonColors(
             backgroundColor = Color.Transparent,
-            contentColor = mainColor
+            contentColor = mainColor,
+            disabledContentColor = Color.Gray,
         ),
         border = BorderStroke(1.dp, mainColor),
     ) {
@@ -316,6 +346,5 @@ private fun FileExplorerScreenPreview() {
 
     }
 }
-
 
 //endregion

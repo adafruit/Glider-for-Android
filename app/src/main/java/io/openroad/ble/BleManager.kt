@@ -62,7 +62,7 @@ object BleManager {
             listOf(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT
-            ) //, Manifest.permission.ACCESS_FINE_LOCATION)
+            )
         } else {
             listOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -140,12 +140,15 @@ object BleManager {
     fun reconnectToPeripherals(
         context: Context,
         addresses: Set<String>,
-        completion: (BleFileTransferPeripheral?) -> Unit
+        connectionTimeout: Int? = null,
+        completion: (List<BleFileTransferPeripheral>) -> Unit
     ) {
+        val connectedAndSetupPeripherals: MutableList<BleFileTransferPeripheral> = mutableListOf()
+
         val adapter = getBluetoothAdapter(context)
         if (adapter == null) {
             log.warning("reconnectToPeripheral called when adapter is null")
-            completion(null)
+            completion(connectedAndSetupPeripherals)
             return
         }
 
@@ -157,16 +160,16 @@ object BleManager {
                 val blePeripheral = BlePeripheral(device)
                 val bleFileTransferPeripheral = BleFileTransferPeripheral(blePeripheral)
                 log.info("Try to connect to known peripheral: ${blePeripheral.nameOrAddress}")
-                bleFileTransferPeripheral.connectAndSetup { isConnected ->
+                bleFileTransferPeripheral.connectAndSetup(connectionTimeout = connectionTimeout) { isConnected ->
                     // Return with the fist connected peripheral or with null if all peripherals fail
                     if (isConnected) {
-                        completion(bleFileTransferPeripheral)
+                        connectedAndSetupPeripherals.add(bleFileTransferPeripheral)
                     }
-                    else {
-                        awaitingConnection.remove(address)
-                        if (awaitingConnection.isEmpty()) {
-                            completion(null)
-                        }
+                    awaitingConnection.remove(address)
+
+                    // Call completion when all awaiting peripherals have finished reconnection
+                    if (awaitingConnection.isEmpty()) {
+                        completion(connectedAndSetupPeripherals)
                     }
                 }
 
@@ -178,6 +181,30 @@ object BleManager {
         // Reconnect even if no identifier was saved if we are already connected to a device with the expected services
         // TODO
 
+    }
+
+    // endregion
+
+    // region Bonding
+    fun removeAllPairedPeripheralInfo(context: Context) {
+        try {
+            val bondedDevices = getPairedPeripherals(context)
+            log.info("Bound devices: $bondedDevices")
+
+            bondedDevices?.forEach { device ->
+                try {
+                    val method = device.javaClass.getMethod("removeBond")
+                    val result = method.invoke(device) as Boolean
+                    if (result) {
+                        log.info("Successfully removed bond")
+                    }
+                } catch (e: Exception) {
+                    log.info("ERROR: could not remove bond: $e")
+                }
+
+            }
+        } catch (ignored: SecurityException) {
+        }
     }
 
     // endregion

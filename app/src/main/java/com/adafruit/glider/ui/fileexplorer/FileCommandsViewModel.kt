@@ -77,7 +77,7 @@ open class FileCommandsViewModel : ViewModel() {
                     _lastTransmit.update {
                         TransmissionLog(
                             TransmissionLog.TransmissionType.Error(
-                                exception.localizedMessage ?: "Unknown Error"
+                                exception.localizedMessage ?: "List directory unknown error"
                             )
                         )
                     }
@@ -111,7 +111,7 @@ open class FileCommandsViewModel : ViewModel() {
                     _lastTransmit.update {
                         TransmissionLog(
                             type = TransmissionLog.TransmissionType.Error(
-                                exception.localizedMessage ?: "Unknown Error"
+                                exception.localizedMessage ?: "Make directory unknown error"
                             )
                         )
                     }
@@ -179,7 +179,7 @@ open class FileCommandsViewModel : ViewModel() {
                     _lastTransmit.update {
                         TransmissionLog(
                             type = TransmissionLog.TransmissionType.Error(
-                                exception.localizedMessage ?: "Unknown Error"
+                                exception.localizedMessage ?: "Read file unknown error"
                             )
                         )
                     }
@@ -229,7 +229,7 @@ open class FileCommandsViewModel : ViewModel() {
                         _lastTransmit.update {
                             TransmissionLog(
                                 type = TransmissionLog.TransmissionType.Error(
-                                    exception.localizedMessage ?: "Unknown Error"
+                                    exception.localizedMessage ?: "Write file unknown error"
                                 )
                             )
                         }
@@ -271,7 +271,7 @@ open class FileCommandsViewModel : ViewModel() {
                     _lastTransmit.update {
                         TransmissionLog(
                             type = TransmissionLog.TransmissionType.Error(
-                                exception.localizedMessage ?: "Unknown Error"
+                                exception.localizedMessage ?: "Move unknown error"
                             )
                         )
                     }
@@ -310,6 +310,51 @@ open class FileCommandsViewModel : ViewModel() {
                 // Compare directory and file
                 else -> if (a.isDirectory) -1 else 1
             }
+        }
+    }
+
+    fun delete(
+        entry: BleFileTransferPeripheral.DirectoryEntry,
+        fileTransferClient: FileTransferClient,
+        completion: ((Result<Unit>) -> Unit)? = null
+    ) {
+        val filename = path.value + entry.name
+        startCommand(description = "Deleting $filename")
+        _isTransmitting.update { true }
+
+        log.info("Deleting $filename")
+        fileTransferClient.deleteFile(
+            path = filename
+        ) { result ->
+            log.info("Delete result for $filename: ${if (result.isSuccess) "success" else "fail"}")
+            _isTransmitting.update { false }
+
+            result.fold(
+                onSuccess = {
+                    listDirectory(this.path.value, fileTransferClient)
+
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.Delete
+                        )
+                    }
+                    completion?.let { it(Result.success(Unit)) }
+                },
+
+                onFailure = { exception ->
+                    log.warning("deleteFile $filename error: $exception")
+                    _lastTransmit.update {
+                        TransmissionLog(
+                            type = TransmissionLog.TransmissionType.Error(
+                                exception.localizedMessage ?: "Delete unknown error"
+                            )
+                        )
+                    }
+                    completion?.let { it(Result.failure(exception)) }
+                }
+            )
+
+            endCommand()
         }
     }
 
