@@ -34,12 +34,10 @@ import java.util.*
  * Created by Antonio García (antonio@openroad.es)
  */
 
-
 @Composable
 fun FileExplorerScaffoldingScreen(
     onFileSelected: (String) -> Unit,
 ) {
-    val navController = rememberNavController()
     val scaffoldState = rememberScaffoldState()
     val isInfoOpen = remember { mutableStateOf(false) }
     Scaffold(

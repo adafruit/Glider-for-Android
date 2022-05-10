@@ -173,6 +173,8 @@ class BleFileTransferPeripheral(
         }
     }
 
+    fun disconnect(cause: Throwable? = null) = blePeripheral.disconnect(cause)
+
     private fun disable() {
         log.info("disable $nameOrAddress")
 

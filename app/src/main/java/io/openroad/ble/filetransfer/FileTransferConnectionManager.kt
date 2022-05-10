@@ -3,6 +3,7 @@ package io.openroad.ble.filetransfer
 import io.openroad.ble.BleManager
 import io.openroad.ble.FileTransferClient
 import io.openroad.ble.applicationContext
+import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.utils.LogUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -50,6 +51,10 @@ object FileTransferConnectionManager {
 
     private var _isAnyPeripheralConnectingOrConnected = MutableStateFlow(false)
     val isAnyPeripheralConnectingOrConnected = _isAnyPeripheralConnectingOrConnected.asStateFlow()
+
+    private var _connectedPeripherals =
+        MutableStateFlow<List<BleFileTransferPeripheral>>(emptyList())
+    val connectedPeripherals = _connectedPeripherals.asStateFlow()
 
     // region Actions
     fun setSelectedPeripheral(bleFileTransferPeripheral: BleFileTransferPeripheral) {
@@ -107,6 +112,8 @@ object FileTransferConnectionManager {
     private fun updateConnectionStatus() {
         // Update isAnyPeripheralConnecting
         _isAnyPeripheralConnectingOrConnected.update { managedPeripherals.firstOrNull { it.connectionState.value.isConnectingOrConnected() } != null }
+
+        _connectedPeripherals.update { managedPeripherals.filter { it.connectionState.value == BlePeripheral.ConnectionState.Connected } }
 
         // Update isConnectedOrReconnecting
         //_isConnectedOrReconnecting.update { _isAnyPeripheralConnecting.value || recoveryPeripheralIdentifier != null }
@@ -206,8 +213,7 @@ object FileTransferConnectionManager {
                                         fileTransferClients.remove(fileTransferPeripheral.address)
                                         updateSelectedPeripheral()
                                         _isSelectedPeripheralReconnecting.update { false }
-                                    }
-                                    else {
+                                    } else {
                                         reconnectedPeripherals.forEach {
                                             addPeripheralToAutomaticallyManagedConnection(it)
                                         }

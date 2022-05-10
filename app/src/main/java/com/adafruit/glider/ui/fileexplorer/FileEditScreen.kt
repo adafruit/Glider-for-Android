@@ -63,7 +63,7 @@ fun FileEditScaffoldingScreen(
 @Composable
 fun FileEditScreen(
     path: String,
-    innerPadding: PaddingValues,
+    innerPadding: PaddingValues = PaddingValues(0.dp),
     viewModel: FileEditViewModel = viewModel(),
 ) {
     // on Appear

@@ -31,4 +31,8 @@ class FileSystemViewModel :
         listDirectory(newPath, fileTransferClient)
         return newPath
     }
+
+    fun disconnect(fileTransferClient: FileTransferClient) {
+        fileTransferClient.bleFileTransferPeripheral.disconnect()
+    }
 }

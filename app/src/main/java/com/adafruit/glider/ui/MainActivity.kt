@@ -20,7 +20,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.adafruit.glider.BuildConfig
 import com.adafruit.glider.R
+import com.adafruit.glider.ui.connected.ConnectedTabScreen
 import com.adafruit.glider.ui.fileexplorer.FileEditScaffoldingScreen
 import com.adafruit.glider.ui.fileexplorer.FileExplorerScaffoldingScreen
 import com.adafruit.glider.ui.scan.ScanScreen
@@ -31,6 +33,8 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.openroad.ble.BleManager
 import io.openroad.ble.filetransfer.FileTransferConnectionManager
+
+val kShowBottomNavigation = BuildConfig.DEBUG && false
 
 // region Lifecycle
 class MainActivity : ComponentActivity() {
@@ -166,11 +170,13 @@ fun GliderNavHost(
         }
 
         composable(ScreenRoute.ConnectedTab.route) {
-            //ConnectedTabScreen()
-            FileExplorerScaffoldingScreen() { selectedFilePath ->
-                // on file selected
-                navController.navigate(ScreenRoute.FileEdit.createRoute(selectedFilePath))
-
+            if (kShowBottomNavigation) {        // Debug connected tab
+                ConnectedTabScreen(navController)
+            } else {
+                FileExplorerScaffoldingScreen { selectedFilePath ->
+                    // on file selected
+                    navController.navigate(ScreenRoute.FileEdit.createRoute(selectedFilePath))
+                }
             }
         }
 

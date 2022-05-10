@@ -27,7 +27,6 @@ sealed class ScreenRoute(val route: String) {
         }
     }
 
-
     companion object {
         fun fromRoute(route: String?): ScreenRoute =
             when (route?.substringBefore("/")) {

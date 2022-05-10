@@ -62,12 +62,14 @@ fun FileSystemScreen(
     // Back button management
     BackHandler {
         // For non-root directory, pressing back lists the parent directory
-        if (!isRootDirectory) {
-            fileTransferClient.value?.let { fileTransferClient ->
+        fileTransferClient.value?.let { fileTransferClient ->
+            if (!isRootDirectory) {
                 viewModel.listParentDirectory(fileTransferClient)?.let { newPath ->
                     onPathChange(newPath)
                 }
-            }
+            }/* else {
+                viewModel.disconnect(fileTransferClient)
+            }*/
         }
     }
 
