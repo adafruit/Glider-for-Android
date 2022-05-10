@@ -1,5 +1,6 @@
 package com.adafruit.glider.ui.fileexplorer
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
@@ -45,6 +46,7 @@ fun FileSystemScreen(
 ) {
     val fileTransferClient =
         FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
+    val isRootDirectory by viewModel.isRootDirectory.collectAsState()
 
     // On Appear -> Setup
     LaunchedEffect(Unit) {
@@ -57,13 +59,25 @@ fun FileSystemScreen(
         }
     }
 
+    // Back button management
+    BackHandler {
+        // For non-root directory, pressing back lists the parent directory
+        if (!isRootDirectory) {
+            fileTransferClient.value?.let { fileTransferClient ->
+                viewModel.listParentDirectory(fileTransferClient)?.let { newPath ->
+                    onPathChange(newPath)
+                }
+            }
+        }
+    }
+
+    //
     Box(
         Modifier
             .gesturesDisabled(isLoading)
             .fillMaxSize()
     ) {
         // Items
-        val isRootDirectory by viewModel.isRootDirectory.collectAsState()
         val entries by viewModel.entries.collectAsState()
         val actionDialogEntry =
             remember { mutableStateOf<BleFileTransferPeripheral.DirectoryEntry?>(null) }
@@ -76,10 +90,10 @@ fun FileSystemScreen(
                 //item {
                 Button(
                     onClick = {
-                        val newPath = upPath(from = path)
-                        onPathChange(newPath)
                         fileTransferClient.value?.let { fileTransferClient ->
-                            viewModel.listDirectory(newPath, fileTransferClient)
+                            viewModel.listParentDirectory(fileTransferClient)?.let { newPath ->
+                                onPathChange(newPath)
+                            }
                         }
                     },
                     colors = ButtonDefaults.textButtonColors(

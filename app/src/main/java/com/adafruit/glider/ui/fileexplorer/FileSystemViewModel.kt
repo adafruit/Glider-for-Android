@@ -2,6 +2,7 @@ package com.adafruit.glider.ui.fileexplorer
 
 import io.openroad.ble.FileTransferClient
 import io.openroad.ble.utils.pathRemovingFilename
+import io.openroad.ble.utils.upPath
 import kotlinx.coroutines.flow.update
 
 /**
@@ -18,5 +19,16 @@ class FileSystemViewModel :
 
         // List directory
         listDirectory(directory = path, fileTransferClient = fileTransferClient)
+    }
+
+    /*
+        Returns the path for the parent directory or null if is a root directory and there is no parent to list
+    */
+    fun listParentDirectory(fileTransferClient: FileTransferClient): String? {
+        if (isRootDirectory.value) return null
+
+        val newPath = upPath(from = _path.value)
+        listDirectory(newPath, fileTransferClient)
+        return newPath
     }
 }
