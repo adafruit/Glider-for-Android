@@ -168,7 +168,7 @@ fun FileExplorerScreen(
                         //.height(42.dp)
                         .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = spacedBy(8.dp)
                 ) {
                     // Current Path
                     Text(
@@ -287,7 +287,7 @@ private fun InputTextActionButton(
             contentColor = Color.Black,
             title = { Text(alertText) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = spacedBy(8.dp)) {
                     Text(alertMessage)
                     TextField(
                         colors = TextFieldDefaults.textFieldColors(

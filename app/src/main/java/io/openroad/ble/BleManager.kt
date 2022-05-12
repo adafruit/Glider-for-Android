@@ -96,7 +96,6 @@ object BleManager {
     // endregion
 
     // region Utils
-
     private fun getBluetoothManager(context: Context): BluetoothManager? {
         return context.applicationContext.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager?
     }

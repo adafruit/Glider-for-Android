@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
 import androidx.annotation.MainThread
 import com.adafruit.glider.BuildConfig
+import com.adafruit.glider.utils.LogHandler
 import io.openroad.ble.BleDisconnectedWhileWaitingForCommandException
 import io.openroad.ble.BleDiscoveryException
 import io.openroad.ble.BleException
@@ -31,7 +32,7 @@ val kFileTransferVersionCharacteristicUUID: UUID =
     UUID.fromString("ADAF0100-4669-6C65-5472-616E73666572")
 val kFileTransferDataCharacteristicUUID: UUID =
     UUID.fromString("ADAF0200-4669-6C65-5472-616E73666572")
-val kFileTransferDebugMessagesEnabled = BuildConfig.DEBUG && false
+val kFileTransferDebugMessagesEnabled = BuildConfig.DEBUG && true
 
 typealias FileTransferDataHandler = (data: ByteArray) -> Unit
 typealias FileTransferProgressHandler = (transmittedBytes: Int, totalBytes: Int) -> Unit
@@ -49,12 +50,14 @@ const val kMoveFileResponseHeaderSize = 2               // (1+1)
 class BleFileTransferPeripheral(
     private val blePeripheral: BlePeripheral,
 ) {
-
     // Data - Private
-    private val log by LogUtils()
-    val address = blePeripheral.address
-    val nameOrAddress = blePeripheral.nameOrAddress
-    val connectionState = blePeripheral.connectionState
+    companion object {
+        private val log by LogUtils()
+
+        init {
+            log.addHandler(LogHandler())
+        }
+    }
 
     private var fileTransferVersion: Int? = null
     private var dataProcessingQueue = DataProcessingQueue()
@@ -67,6 +70,11 @@ class BleFileTransferPeripheral(
     private var moveStatus: MoveStatus? = null
 
     private var setupCompletionHandler: BlePeripheralConnectCompletionHandler? = null
+
+    // Data
+    val address = blePeripheral.address
+    val nameOrAddress = blePeripheral.nameOrAddress
+    val connectionState = blePeripheral.connectionState
 
     // States
     sealed class FileTransferState {
@@ -110,6 +118,8 @@ class BleFileTransferPeripheral(
 
     // region Lifecycle
     init {
+
+
         blePeripheral.externalScope.launch {
             // Listen to state changes
             blePeripheral.connectionState
@@ -146,7 +156,6 @@ class BleFileTransferPeripheral(
                     else -> {}
                 }
             }
-
         }
     }
     // endregion
@@ -176,7 +185,7 @@ class BleFileTransferPeripheral(
     fun disconnect(cause: Throwable? = null) = blePeripheral.disconnect(cause)
 
     private fun disable() {
-        log.info("disable $nameOrAddress")
+        //log.info("disable $nameOrAddress")
 
         // Clear all internal data
         fileTransferVersion = null
@@ -469,7 +478,6 @@ class BleFileTransferPeripheral(
             }
         }
     }
-
 
     fun makeDirectory(
         path: String,

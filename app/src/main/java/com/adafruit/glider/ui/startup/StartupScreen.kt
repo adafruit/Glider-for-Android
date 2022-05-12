@@ -91,10 +91,9 @@ fun StartupScreen(
             }
         }
     }
-
 }
 
-
+/*
 @Composable
 private fun BluetoothState() {
     val bleState = if (LocalInspectionMode.current) {       // In preview mode
@@ -126,7 +125,7 @@ private fun BluetoothStateContent(bleState: BleState) {
 
     Text("State: $text")
 }
-
+*/
 
 // region Previews
 @Preview(showSystemUi = true)

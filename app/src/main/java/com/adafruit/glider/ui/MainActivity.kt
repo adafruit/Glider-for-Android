@@ -15,26 +15,32 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.adafruit.glider.BuildConfig
+import com.adafruit.glider.GliderApplication
 import com.adafruit.glider.R
 import com.adafruit.glider.ui.connected.ConnectedTabScreen
 import com.adafruit.glider.ui.fileexplorer.FileEditScaffoldingScreen
 import com.adafruit.glider.ui.fileexplorer.FileExplorerScaffoldingScreen
 import com.adafruit.glider.ui.scan.ScanScreen
 import com.adafruit.glider.ui.startup.StartupScreen
+import com.adafruit.glider.ui.status.BluetoothStatusScreen
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.utils.observeAsState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.openroad.ble.BleManager
 import io.openroad.ble.filetransfer.FileTransferConnectionManager
+import io.openroad.ble.state.BleState
+import io.openroad.ble.state.BleStateViewModel
+import io.openroad.ble.state.BleStateViewModelFactory
 
-val kShowBottomNavigation = BuildConfig.DEBUG && false
+val kShowBottomNavigation = BuildConfig.DEBUG && true
 
 // region Lifecycle
 class MainActivity : ComponentActivity() {
@@ -62,11 +68,24 @@ fun GliderApp() {
     //val backstackEntry = navController.currentBackStackEntryAsState()
     //val currentScreen = GliderScreen.fromRoute(backstackEntry.value?.destination?.route)
 
+    // Bluetooth State
+    val appContainer =
+        (LocalContext.current.applicationContext as GliderApplication).appContainer
+    val bleStateViewModel: BleStateViewModel = viewModel(
+        factory = BleStateViewModelFactory(appContainer.bleStateRepository)
+    )
+    val bleStateState = bleStateViewModel.bleBleState.collectAsState()
+
     GliderTheme {
-        GliderNavHost(
-            navController = navController,
-            //modifier = Modifier.padding(innerPadding)
-        )
+        if (bleStateState.value != BleState.Enabled) {
+            BluetoothStatusScreen()
+        }
+        else {
+            GliderNavHost(
+                navController = navController,
+                //modifier = Modifier.padding(innerPadding)
+            )
+        }
     }
 }
 
@@ -145,7 +164,7 @@ fun GliderNavHost(
         }
 
         composable(ScreenRoute.BluetoothStatus.route) {
-            // TODO
+            BluetoothStatusScreen()
         }
 
         composable(ScreenRoute.Scan.route) {

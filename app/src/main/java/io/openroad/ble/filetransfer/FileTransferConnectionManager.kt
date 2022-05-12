@@ -118,7 +118,7 @@ object FileTransferConnectionManager {
         // Update isConnectedOrReconnecting
         //_isConnectedOrReconnecting.update { _isAnyPeripheralConnecting.value || recoveryPeripheralIdentifier != null }
 
-        log.info("isAnyPeripheralConnecting: ${isAnyPeripheralConnectingOrConnected.value}")
+        log.info("isAnyPeripheralConnectingOrConnected: ${isAnyPeripheralConnectingOrConnected.value}")
     }
 
     private fun updateSelectedPeripheral() {

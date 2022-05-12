@@ -3,6 +3,7 @@ package com.adafruit.glider.ui.connected
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import com.adafruit.glider.ui.fileexplorer.FileExplorerScreen
 import com.adafruit.glider.ui.theme.AccentMain
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.TopBarBackground
+import io.openroad.utils.LogUtils
 
 /**
  * Created by Antonio García (antonio@openroad.es)
@@ -45,10 +47,22 @@ fun ConnectedTabScreen(
                 title = { Text(currentScreen.title()) }, backgroundColor = TopBarBackground
             )
         },
-        bottomBar = { BottomNavigation(navController = navControllerBottomBar) },
+        bottomBar = {
+            BottomNavigation(
+                navController = navControllerBottomBar, items = listOf(
+                    BottomNavItem.Info,
+                    BottomNavItem.FileExplorer,
+                    BottomNavItem.Log,
+                )
+            )
+        },
         //scaffoldState = scaffoldState,
     ) { innerPadding ->
-        ConnectedTabScreenBody(navController = navController, navControllerBottomBar = navControllerBottomBar, innerPadding = innerPadding)
+        ConnectedTabScreenBody(
+            navController = navController,
+            navControllerBottomBar = navControllerBottomBar,
+            innerPadding = innerPadding
+        )
     }
 }
 
@@ -76,24 +90,31 @@ private fun ConnectedTabScreenBody(
                 navController.navigate(ScreenRoute.FileEdit.createRoute(selectedFilePath))
             }
         }
+
+        composable(ConnectedTabScreenRoute.Log.route) {
+            LogScreen()
+        }
     }
 }
 // endregion
 
 // region BottomNavigation
-sealed class BottomNavItem(var title: String, var imageVector: ImageVector, var screenRoute: String) {
+sealed class BottomNavItem(
+    var title: String,
+    var imageVector: ImageVector,
+    var screenRoute: String
+) {
     object Info : BottomNavItem("Info", Icons.Outlined.Link, ConnectedTabScreenRoute.Info.route)
-    object FileExplorer : BottomNavItem("Explorer",Icons.Outlined.FolderOpen, ConnectedTabScreenRoute.FileExplorer.route)
+    object FileExplorer : BottomNavItem(
+        "Explorer",
+        Icons.Outlined.FolderOpen,
+        ConnectedTabScreenRoute.FileExplorer.route
+    )
+    object Log : BottomNavItem("Log", Icons.Outlined.Code, ConnectedTabScreenRoute.Log.route)
 }
 
 @Composable
-fun BottomNavigation(navController: NavController) {
-
-    val items = listOf(
-        BottomNavItem.Info,
-        BottomNavItem.FileExplorer,
-    )
-
+private fun BottomNavigation(navController: NavController, items: List<BottomNavItem>) {
     BottomNavigation(
         backgroundColor = Color.Transparent,//colorResource(id = R.color.teal_200),
         contentColor = Color.Red,
@@ -135,7 +156,6 @@ fun BottomNavigation(navController: NavController) {
 }
 // endregion
 
-
 // region Previews
 @Preview(showSystemUi = true)
 @Composable
@@ -144,9 +164,6 @@ private fun ConnectedTabScreenPreview() {
         BackgroundGradientDefault {
             ConnectedTabScreen()
         }
-
     }
 }
-
-
 //endregion

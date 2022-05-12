@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
@@ -198,7 +199,7 @@ fun FileSystemScreen(
         // Empty View / Wait View
         Column(
             modifier = Modifier.align(Alignment.Center),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Empty view
@@ -236,7 +237,7 @@ private fun RenameDialog(
         contentColor = Color.Black,
         title = { Text("Rename") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = spacedBy(8.dp)) {
                 Text("Enter new name for '$name'")
                 TextField(
                     colors = TextFieldDefaults.textFieldColors(
@@ -296,7 +297,7 @@ private fun ActionDialog(
                     .width(IntrinsicSize.Max)
                     .padding(12.dp)
                     .defaultMinSize(minWidth = 200.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = spacedBy(4.dp)
             ) {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
@@ -382,7 +383,7 @@ private fun FileRow(
 
 @Composable
 private fun ItemRow(imageVector: ImageVector, imageDescription: String, name: String, size: Int?) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = spacedBy(12.dp)) {
         Icon(
             imageVector = imageVector,
             contentDescription = imageDescription

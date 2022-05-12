@@ -1,6 +1,7 @@
 package com.adafruit.glider.ui.connected
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.MaterialTheme
@@ -34,48 +35,61 @@ fun InfoScreen(
     val selectedFileTransferClient by FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
 
     Column(
+        Modifier
+            .padding(innerPadding)
+            .padding(20.dp)
+            .padding(top = 20.dp),      // Extra top padding
+        verticalArrangement = spacedBy(1.dp)
     ) {
-        // Peripheral
-        Column(
-            Modifier
-                .padding(innerPadding)
-                .padding(20.dp)
-                .padding(top = 20.dp),      // Extra top padding
-            verticalArrangement = Arrangement.Absolute.spacedBy(1.dp)
-        ) {
-            Text(
-                modifier = Modifier
-                    .align(CenterHorizontally)
-                    .padding(bottom = 4.dp),
-                text = "Connected Peripherals".uppercase(),
-                style = MaterialTheme.typography.subtitle2
-            )
+        Text(
+            modifier = Modifier
+                .align(CenterHorizontally)
+                .padding(bottom = 4.dp),
+            text = "Connected Peripherals".uppercase(),
+            style = MaterialTheme.typography.subtitle2
+        )
 
-            if (connectedPeripherals.isEmpty()) {
-                Text("No peripherals found".uppercase())
-            } else {
-                val selectedPeripheral = selectedFileTransferClient?.bleFileTransferPeripheral
+        if (connectedPeripherals.isEmpty()) {
+            Button(
+                onClick = { /*No action*/ },
+                colors = ButtonDefaults.textButtonColors(
+                    backgroundColor = mainColor,
+                    contentColor = Color.Black
+                ),
+                enabled = false,
+                modifier = Modifier.height(IntrinsicSize.Min),
+                contentPadding = PaddingValues(8.dp),
+            ) {
+                Text(
+                    "No peripherals found".uppercase(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.CenterVertically),
+                    textAlign = TextAlign.Left,
+                )
+            }
+        } else {
+            val selectedPeripheral = selectedFileTransferClient?.bleFileTransferPeripheral
 
-                connectedPeripherals.forEach { bleFileTransferPeripheral ->
-                    Button(
-                        onClick = { /*TODO*/ },
-                        colors = ButtonDefaults.textButtonColors(
-                            backgroundColor = mainColor,
-                            contentColor = Color.Black
-                        ),
-                        enabled = !isReconnecting,
-                        modifier = Modifier.height(IntrinsicSize.Min),
-                        contentPadding = PaddingValues(8.dp),
-                    ) {
-                        Text(
-                            bleFileTransferPeripheral.nameOrAddress,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.CenterVertically),
-                            textAlign = TextAlign.Left,
-                            fontWeight = if (selectedPeripheral?.address == bleFileTransferPeripheral.address) FontWeight.Bold else FontWeight.Normal
-                        )
-                    }
+            connectedPeripherals.forEach { bleFileTransferPeripheral ->
+                Button(
+                    onClick = { /*TODO*/ },
+                    colors = ButtonDefaults.textButtonColors(
+                        backgroundColor = mainColor,
+                        contentColor = Color.Black
+                    ),
+                    enabled = !isReconnecting,
+                    modifier = Modifier.height(IntrinsicSize.Min),
+                    contentPadding = PaddingValues(8.dp),
+                ) {
+                    Text(
+                        bleFileTransferPeripheral.nameOrAddress,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.CenterVertically),
+                        textAlign = TextAlign.Left,
+                        fontWeight = if (selectedPeripheral?.address == bleFileTransferPeripheral.address) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
             }
         }
@@ -85,7 +99,7 @@ fun InfoScreen(
 // region Previews
 @Preview(showSystemUi = true)
 @Composable
-private fun FileExplorerScreenPreview() {
+private fun InfoScreenPreview() {
     GliderTheme {
         BackgroundGradientDefault {
             InfoScreen(PaddingValues(0.dp))

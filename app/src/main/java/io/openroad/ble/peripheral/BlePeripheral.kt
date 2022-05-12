@@ -260,14 +260,14 @@ open class BlePeripheral(
         val currentBondState = BleBondState.from(bluetoothDevice.bondState)
         bondStateJob = externalScope.launch {
             bleBondDataSource =
-                BleBondStateDataSource(applicationContext, address, currentBondState)
+                BleBondStateDataSource(applicationContext, address/*, currentBondState*/)
             bleBondDataSource?.bleBondStateFlow?.collect { bondState ->
 
                 _bondingState.update { bondState }
                 when (bondState) {
                     BleBondState.Bonding -> log.info("$nameOrAddress bonding")
                     BleBondState.Bonded -> {
-                        log.info("$nameOrAddress bonded")
+                        log.info("$nameOrAddress is bonded")
 
                         // Save bonded information
                         BleKnownPeripheralAddresses.addPeripheralAddress(address)
@@ -841,7 +841,7 @@ open class BlePeripheral(
             characteristic: BluetoothGattCharacteristic
         ) {
             super.onCharacteristicChanged(gatt, characteristic)
-            log.info("onCharacteristicChanged. numCaptureReadHandlers: " + captureReadHandlers.size)
+            //log.info("onCharacteristicChanged. numCaptureReadHandlers: " + captureReadHandlers.size)
             val identifier: String = getCharacteristicIdentifier(characteristic)
             val status =
                 BluetoothGatt.GATT_SUCCESS // On Android, there is no error reported for this callback, so we assume it is SUCCESS

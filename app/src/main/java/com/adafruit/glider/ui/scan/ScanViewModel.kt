@@ -86,7 +86,6 @@ class ScanViewModel(
                     serviceUuids?.contains(kFileTransferServiceUUID) ?: false
                 }
                 .sortedBy { it.createdMillis }
-
         }
 
     /*
@@ -109,6 +108,20 @@ class ScanViewModel(
                 .collect { bleException ->
                     _uiState.update { ScanUiState.ScanningError(bleException) }
                 }
+        }
+
+        // Listen to reconnections
+        viewModelScope.launch {
+            FileTransferConnectionManager.isAnyPeripheralConnectingOrConnected.collect { isReconnecting ->
+                log.info("scanviewmodel isAnyPeripheralConnectingOrConnected $isReconnecting")
+                if (isReconnecting) {
+                    _uiState.update { ScanUiState.RestoringConnection }
+                   // stopScanning()
+                }
+                else {
+                   startScanning()
+                }
+            }
         }
     }
 

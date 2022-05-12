@@ -49,6 +49,6 @@ fun BackgroundGradientDefault(content: @Composable () -> Unit) {
 
 @Preview(showSystemUi = true)
 @Composable
-fun Background() {
+fun BackgroundPreview() {
     BackgroundGradientDefault {}
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
@@ -113,8 +114,8 @@ private fun ScanBody(
     // UI
     Column(
         modifier = Modifier.padding(innerPadding),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalAlignment = CenterHorizontally,
+        verticalArrangement = spacedBy(20.dp),
     ) {
         Waves(
             Modifier
@@ -127,14 +128,14 @@ private fun ScanBody(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = spacedBy(20.dp),
         ) {
 
             // Status
             Crossfade(targetState = uiState) { state ->
                 when (state) {
                     ScanViewModel.ScanUiState.Scanning -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Column(verticalArrangement = spacedBy(20.dp)) {
                             Text(
                                 "Hold a File-Transfer compatible peripheral close to your device",
                                 modifier = Modifier.fillMaxWidth(),
@@ -154,7 +155,7 @@ private fun ScanBody(
                         }
                     }
                     else -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Column(verticalArrangement = spacedBy(20.dp)) {
                             Text(
                                 "Status:",
                                 modifier = Modifier.fillMaxWidth(),
@@ -171,7 +172,7 @@ private fun ScanBody(
                 }
             }
 
-            if (BuildConfig.DEBUG) {
+            if (BuildConfig.DEBUG && false) {
                 Text("[Debug] Found: $numDevicesFound devices")
                 Text("[Debug] Matching: $numMatchingDevicesInRangeFound devices")
             }
@@ -197,7 +198,6 @@ private fun ScanBody(
                     Text("Remove paired peripherals info", style = MaterialTheme.typography.caption)
                 }
             }
-
         }
     }
 }

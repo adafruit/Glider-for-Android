@@ -18,14 +18,13 @@ import kotlinx.coroutines.flow.callbackFlow
 /*
     deviceAddress: Set to null to receive all bond state changes, or set to a specific addressz to recevie only changes for that device
  */
-class BleBondStateDataSource(context: Context, deviceAddress: String?, initialValue: BleBondState) {
+class BleBondStateDataSource(context: Context, deviceAddress: String?) {//, initialValue: BleBondState) {
     // Data - Internal
     private val log by LogUtils()
 
     val bleBondStateFlow = callbackFlow {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-
 
                 if (intent.action == BluetoothDevice.ACTION_BOND_STATE_CHANGED) {
                     val device =
@@ -34,19 +33,8 @@ class BleBondStateDataSource(context: Context, deviceAddress: String?, initialVa
                     // Only continue if the device address matches the one we are interested in
                     if (deviceAddress == null || device?.address == deviceAddress) {
 
-                        val previousBondState =
-                            intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1)
+                        //val previousBondState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1)
                         val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1)
-
-                        /*
-                        if (BuildConfig.DEBUG) {
-                            when (bondState) {
-                                BluetoothDevice.BOND_BONDED -> log.info("Bonded")
-                                BluetoothDevice.BOND_BONDING -> log.info("Bonding")
-                                BluetoothDevice.BOND_NONE -> log.info("Not Bonded")
-                                else -> log.warning("Error: unknown bond state: $bondState")
-                            }
-                        }*/
 
                         val bleBondState = BleBondState.from(bondState)
                         trySend(bleBondState)
@@ -55,14 +43,13 @@ class BleBondStateDataSource(context: Context, deviceAddress: String?, initialVa
                             }
                     }
                 }
-
             }
         }
 
         // Set initial value
-        trySend(initialValue)
+        //trySend(initialValue)
 
-        log.info("Start bond detector for: $deviceAddress")
+        //log.info("Start bond detector for: $deviceAddress")
 
         // Register receiver
         val filter = IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
@@ -71,7 +58,7 @@ class BleBondStateDataSource(context: Context, deviceAddress: String?, initialVa
         // Await close and unregister receiver
         awaitClose {
             context.unregisterReceiver(receiver)
-            log.info("End bond detector for: $deviceAddress")
+            //log.info("End bond detector for: $deviceAddress")
         }
     }
 }
