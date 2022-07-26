@@ -5,24 +5,36 @@ package com.adafruit.glider
  */
 
 import android.content.Context
-import io.openroad.ble.FileTransferClient
-import io.openroad.ble.state.BleStateDataSource
-import io.openroad.ble.state.BleStateRepository
-import io.openroad.utils.LogUtils
+import io.openroad.filetransfer.ConnectionManager
+import io.openroad.wifi.scanner.WifiPeripheralScanner
+import io.openroad.wifi.scanner.WifiPeripheralScannerImpl
 import kotlinx.coroutines.MainScope
 
-// Container of objects shared across the whole app
-class AppContainer(context: Context) {
-
-    // Data
-    private val log by LogUtils()
-    var bleStateRepository: BleStateRepository
-
-   // var fileTransferClient: FileTransferClient? = null      // TODO: move this from here
-
-    init {
-        val bleStateDataSource = BleStateDataSource(context)
-        bleStateRepository = BleStateRepository(bleStateDataSource, MainScope())
-    }
+/**
+ * Dependency Injection container at the application level.
+ */
+interface AppContainer {
+    val wifiPeripheralScanner: WifiPeripheralScanner
+    val connectionManager: ConnectionManager
 }
 
+/**
+ * Implementation for the Dependency Injection container at the application level.
+ *
+ * Variables are initialized lazily and the same instance is shared across the whole app.
+ */
+class AppContainerImpl(private val applicationContext: Context) : AppContainer {
+    override val wifiPeripheralScanner: WifiPeripheralScanner by lazy {
+        WifiPeripheralScannerImpl(
+            context = applicationContext,
+            serviceType = "_circuitpython._tcp.",
+            externalScope = MainScope()
+        )
+    }
+
+    override val connectionManager: ConnectionManager by lazy {
+        ConnectionManager(
+            wifiPeripheralScanner = wifiPeripheralScanner
+        )
+    }
+}

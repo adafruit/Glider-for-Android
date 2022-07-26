@@ -1,13 +1,13 @@
 package com.adafruit.glider.ui.fileexplorer
 
-import io.openroad.ble.FileTransferClient
-import io.openroad.ble.utils.pathRemovingFilename
-import io.openroad.ble.utils.upPath
-import kotlinx.coroutines.flow.update
-
 /**
  * Created by Antonio García (antonio@openroad.es)
  */
+
+import io.openroad.filetransfer.FileTransferClient
+import io.openroad.utils.pathRemovingFilename
+import io.openroad.utils.upPath
+import kotlinx.coroutines.flow.update
 
 class FileSystemViewModel :
     FileCommandsViewModel() {
@@ -32,7 +32,4 @@ class FileSystemViewModel :
         return newPath
     }
 
-    fun disconnect(fileTransferClient: FileTransferClient) {
-        fileTransferClient.bleFileTransferPeripheral.disconnect()
-    }
 }

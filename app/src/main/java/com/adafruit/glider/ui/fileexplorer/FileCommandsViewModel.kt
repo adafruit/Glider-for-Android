@@ -1,18 +1,22 @@
 package com.adafruit.glider.ui.fileexplorer
 
+/**
+ * Created by Antonio García (antonio@openroad.es)
+ */
+
 import androidx.lifecycle.ViewModel
-import io.openroad.ble.FileTransferClient
-import io.openroad.ble.filetransfer.BleFileTransferPeripheral
-import io.openroad.ble.utils.isRootDirectory
-import io.openroad.utils.LogUtils
+import androidx.lifecycle.viewModelScope
+import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.DirectoryEntry
+import io.openroad.filetransfer.FileTransferClient
+import io.openroad.filetransfer.TransmissionLog
+import io.openroad.filetransfer.TransmissionProgress
+import io.openroad.utils.isRootDirectory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.*
 
-/**
- * Created by Antonio García (antonio@openroad.es)
- */
 open class FileCommandsViewModel : ViewModel() {
     // Params
     var showOnlyDirectories = false
@@ -24,7 +28,7 @@ open class FileCommandsViewModel : ViewModel() {
     private val _isRootDirectory = MutableStateFlow(true)
     val isRootDirectory = _isRootDirectory.asStateFlow()
 
-    private val _entries = MutableStateFlow<List<BleFileTransferPeripheral.DirectoryEntry>>(
+    private val _entries = MutableStateFlow<List<DirectoryEntry>>(
         emptyList()
         /*
         listOf(
@@ -43,7 +47,6 @@ open class FileCommandsViewModel : ViewModel() {
     val lastTransmit = _lastTransmit.asStateFlow()
     //MutableStateFlow(TransmissionLog(TransmissionLog.TransmissionType.Write(334, null)))
 
-
     // region Actions
 
     fun listDirectory(directory: String, fileTransferClient: FileTransferClient) {
@@ -53,7 +56,10 @@ open class FileCommandsViewModel : ViewModel() {
         _entries.update { emptyList() }
         _isTransmitting.update { true }
 
-        fileTransferClient.listDirectory(directory) { result ->
+        fileTransferClient.listDirectory(
+            externalScope = viewModelScope,
+            path = directory,
+        ) { result ->
             _isTransmitting.update { false }
 
             result.fold(
@@ -92,7 +98,10 @@ open class FileCommandsViewModel : ViewModel() {
         startCommand(description = "Creating $path")
         _isTransmitting.update { true }
 
-        fileTransferClient.makeDirectory(path) { result ->
+        fileTransferClient.makeDirectory(
+            externalScope = viewModelScope,
+            path = path
+        ) { result ->
             _isTransmitting.update { false }
 
             result.fold(
@@ -128,7 +137,7 @@ open class FileCommandsViewModel : ViewModel() {
             data = byteArrayOf(),
             fileTransferClient = fileTransferClient
         ) { result ->
-            result.getOrNull()?.let {
+            if (result.isSuccess) {
                 // On success, force list again directory
                 listDirectory(directory = this.path.value, fileTransferClient = fileTransferClient)
             }
@@ -137,7 +146,7 @@ open class FileCommandsViewModel : ViewModel() {
 
     fun renameFile(fromPath: String, toPath: String, fileTransferClient: FileTransferClient) {
         moveFile(fromPath, toPath, fileTransferClient) { result ->
-            result.getOrNull()?.let {
+            if (result.isSuccess) {
                 // On success, force list again directory
                 listDirectory(directory = this.path.value, fileTransferClient = fileTransferClient)
             }
@@ -152,7 +161,7 @@ open class FileCommandsViewModel : ViewModel() {
         startCommand(description = "Reading $filePath")
         _isTransmitting.update { true }
 
-        fileTransferClient.readFile(filePath, progress = { transmittedBytes, totalBytes ->
+        fileTransferClient.readFile(path = filePath, progress = { transmittedBytes, totalBytes ->
             val newProgress = transmissionProgress.value?.copy(
                 transmittedBytes = transmittedBytes,
                 totalBytes = totalBytes
@@ -201,6 +210,7 @@ open class FileCommandsViewModel : ViewModel() {
         _isTransmitting.update { true }
 
         fileTransferClient.writeFile(
+            externalScope = viewModelScope,
             path = filename,
             data = data,
             progress = { transmittedBytes, totalBytes ->
@@ -251,6 +261,7 @@ open class FileCommandsViewModel : ViewModel() {
         _isTransmitting.update { true }
 
         fileTransferClient.moveFile(
+            externalScope = viewModelScope,
             fromPath = fromPath,
             toPath = toPath
         ) { result ->
@@ -283,7 +294,7 @@ open class FileCommandsViewModel : ViewModel() {
         }
     }
 
-    private fun setEntries(entries: List<BleFileTransferPeripheral.DirectoryEntry>) {
+    private fun setEntries(entries: List<DirectoryEntry>) {
         // Filter if needed
         val filteredEntries =
             if (showOnlyDirectories) entries.filter { it.isDirectory } else entries
@@ -296,10 +307,10 @@ open class FileCommandsViewModel : ViewModel() {
     }
 
     private class CompareDirectoryEntry {
-        companion object : Comparator<BleFileTransferPeripheral.DirectoryEntry> {
+        companion object : Comparator<DirectoryEntry> {
             override fun compare(
-                a: BleFileTransferPeripheral.DirectoryEntry,
-                b: BleFileTransferPeripheral.DirectoryEntry
+                a: DirectoryEntry,
+                b: DirectoryEntry
             ): Int = when {
                 // Both directories: order alphabetically
                 a.isDirectory && b.isDirectory -> a.name.compareTo(b.name)
@@ -314,11 +325,12 @@ open class FileCommandsViewModel : ViewModel() {
     }
 
     fun delete(
-        entry: BleFileTransferPeripheral.DirectoryEntry,
+        entry: DirectoryEntry,
         fileTransferClient: FileTransferClient,
         completion: ((Result<Unit>) -> Unit)? = null
     ) {
-        val filename = path.value + entry.name
+        val filename = path.value + entry.name + (if (entry.isDirectory) '/' else "")
+
         startCommand(description = "Deleting $filename")
         _isTransmitting.update { true }
 
@@ -358,6 +370,9 @@ open class FileCommandsViewModel : ViewModel() {
         }
     }
 
+    fun disconnect(fileTransferClient: FileTransferClient) {
+        fileTransferClient.peripheral.disconnect()
+    }
     // endregion
 
     // region Transmission Status

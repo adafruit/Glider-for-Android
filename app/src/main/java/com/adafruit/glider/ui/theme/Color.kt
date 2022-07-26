@@ -2,23 +2,27 @@ package com.adafruit.glider.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple200 = Color(0xFFBB86FC)
-val Purple500 = Color(0xFF6200EE)
-val Purple700 = Color(0xFF3700B3)
-val Teal200 = Color(0xFF03DAC5)
+val Purple80 = Color(0xFFD0BCFF)
+val PurpleGrey80 = Color(0xFFCCC2DC)
+val Pink80 = Color(0xFFEFB8C8)
 
-var BackgroundDefault = Color(0xFF2A4665)
+val Purple40 = Color(0xFF6650a4)
+val PurpleGrey40 = Color(0xFF625b71)
+val Pink40 = Color(0xFF7D5260)
+
+
+// -------------
+//var StatusBarBackground = Color(0xFF29517E)
 var TopBarBackground = Color(0xFF2C4D72)
 
-
-var AccentMain = Color(0xFF15CEB8)
+var BackgroundDefault = Color(0xFF2A4665)
 var BackgroundGradientEnd = Color(0xFF09203F)
 var BackgroundGradientStart = Color(0xFF537895)
-var ButtonMainText = Color(0xFF09203F)
-var ButtonPrimaryAccent = Color(0xFFA1A4A7)
-var ButtonPrimaryDisabled = Color(0xFF6B6B6C)
-var ButtonPrimaryText = Color.White
-var ButtonWarningBackground = Color(0xFFA00E16)
-var ButtonWarningText = Color(0xFFFF1925)
+
+var AccentMain = Color(0xFF15CEB8)
+
+var ControlsOutline = Color.White.copy(alpha = 0.7f)
+
 var TabBackground = Color(0xFF09203F)
 
+var WarningBackground = Color(0xFFA00E16)

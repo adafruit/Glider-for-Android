@@ -7,17 +7,12 @@ package com.adafruit.glider
 import android.app.Application
 
 class GliderApplication : Application() {
+    // AppContainer instance used by the rest of classes to obtain dependencies
+    lateinit var container: AppContainer
 
-    val appContainer = AppContainer(this)      // Manual injection: https://developer.android.com/training/dependency-injection/manual
-
-    init {
-        // Debug coroutines in Debug mode
-        /*
-        if (BuildConfig.DEBUG) {
-            System.setProperty(
-                kotlinx.coroutines.DEBUG_PROPERTY_NAME,
-                kotlinx.coroutines.DEBUG_PROPERTY_VALUE_ON
-            )
-        }*/
+    override fun onCreate() {
+        super.onCreate()
+        container = AppContainerImpl(this)
     }
+
 }

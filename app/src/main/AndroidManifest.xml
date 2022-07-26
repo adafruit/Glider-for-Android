@@ -2,65 +2,33 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Bluetooth permission is required on Android 4.3 - 11 in order to communicate with Bluetooth LE devices. -->
-    <uses-permission
-        android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30" />
-    <!-- Bluetooth Admin permission is required on Android 4.3 - 11 in order to scan for Bluetooth LE devices. -->
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_ADMIN"
-        android:maxSdkVersion="30" />
-    <!-- Location permission is required from Android 6 to 11 to be able to scan for advertising Bluetooth LE devices. -->
-    <uses-permission
-        android:name="android.permission.ACCESS_COARSE_LOCATION"
-        android:maxSdkVersion="30" />
-    <uses-permission
-        android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="30" />
-    <!-- BLUETOOTH_SCAN permission is needed from Android 12 to scan for Bluetooth LE devices. -->
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation"
-        tools:targetApi="s" />
-    <!-- BLUETOOTH_CONNECT permission is required from Android 12 to connect to a Bluetooth LE device -->
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Internet -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <uses-feature
-        android:name="android.hardware.bluetooth_le"
-        android:required="true" />
 
     <application
         android:name=".GliderApplication"
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Glider">
+        android:theme="@style/Theme.Glider"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="32">
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@style/Theme.Glider"
-            android:windowSoftInputMode="adjustResize">
+            android:theme="@style/Theme.Glider">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
-
-            <meta-data
-                android:name="io.openroad.ble.BleInitializer"
-                android:value="androidx.startup" />
-        </provider>
-
     </application>
 
 </manifest>
