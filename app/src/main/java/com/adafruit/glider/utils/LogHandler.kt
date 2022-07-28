@@ -1,11 +1,12 @@
 package com.adafruit.glider.utils
 
-import java.util.logging.LogRecord
-import java.util.logging.StreamHandler
-
 /**
  * Created by Antonio García (antonio@openroad.es)
  */
+
+import java.util.logging.LogRecord
+import java.util.logging.StreamHandler
+
 class LogHandler : StreamHandler() {
 
     override fun publish(record: LogRecord?) {

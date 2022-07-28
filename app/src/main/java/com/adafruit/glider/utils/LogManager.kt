@@ -1,15 +1,14 @@
 package com.adafruit.glider.utils
 
-import io.openroad.utils.LogUtils
+/**
+ * Created by Antonio García (antonio@openroad.es)
+ */
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.logging.Level
-
-/**
- * Created by Antonio García (antonio@openroad.es)
- */
 
 object LogManager {
     // Config
@@ -21,7 +20,7 @@ object LogManager {
         val category: Category,
         val level: Level,
         val text: String,
-        val millis: Long
+        val millis: Long = System.currentTimeMillis()
     ) {
 
         enum class Category {

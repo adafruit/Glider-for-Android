@@ -9,35 +9,29 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Text
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.adafruit.glider.GliderApplication
 import com.adafruit.glider.R
-import com.adafruit.glider.ui.BackgroundDefault
+import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.GliderTheme
-import io.openroad.ble.state.BleState
-import io.openroad.ble.state.BleStateViewModel
-import io.openroad.ble.state.BleStateViewModelFactory
 
 @Composable
 fun StartupScreen(
-    isInitialPermissionsCheckInProgress: Boolean,
-    viewModel: StartupViewModel = viewModel(),
+    // isInitialPermissionsCheckInProgress: Boolean,
+    //viewModel: StartupViewModel = viewModel(),
     onFinished: () -> Unit
 ) {
+
+    val isRestoringConnection = false
+    /*
     // UI State
     val uiState by viewModel.uiState.collectAsState()
     val isRestoringConnection = uiState == StartupViewModel.StartupUiState.Reconnecting
@@ -63,32 +57,26 @@ fun StartupScreen(
             }
         }
         else -> {}
-    }
+    }*/
 
     // UI
-    BackgroundDefault {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        )
-        {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.glider_logo),
-                    contentDescription = "Glider logo",
-                )
+    BackgroundGradientFillMaxSize(contentAlignment = Alignment.Center) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.glider_logo),
+                contentDescription = "Glider logo",
+            )
 
-                Text(
-                    "Restoring Connection...",
-                    Modifier.alpha(if (isRestoringConnection) 1.0f else 0.0f)
-                )
+            Text(
+                "Restoring Connection...",
+                Modifier.alpha(if (isRestoringConnection) 1.0f else 0.0f)
+            )
 
-                CircularProgressIndicator()
-                //BluetoothState()
-            }
+            CircularProgressIndicator(color = Color.White)
+            //BluetoothState()
         }
     }
 }
@@ -132,7 +120,7 @@ private fun BluetoothStateContent(bleState: BleState) {
 @Composable
 private fun StartupPreview() {
     GliderTheme {
-        StartupScreen(true) {}
+        StartupScreen(/*true*/) {}
     }
 }
 //endregion

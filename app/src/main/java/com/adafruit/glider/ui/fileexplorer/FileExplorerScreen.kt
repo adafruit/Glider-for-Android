@@ -1,15 +1,18 @@
 package com.adafruit.glider.ui.fileexplorer
 
+/**
+ * Created by Antonio García (antonio@openroad.es)
+ */
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement.Absolute.spacedBy
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CreateNewFolder
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NoteAdd
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,123 +24,58 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.compose.rememberNavController
-import com.adafruit.glider.BuildConfig
-import com.adafruit.glider.ui.BackgroundGradientDefault
+import com.adafruit.glider.ui.components.ConfirmActionDialog
+import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
+import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
-import com.adafruit.glider.ui.theme.TabBackground
-import com.adafruit.glider.ui.theme.TopBarBackground
-import io.openroad.ble.filetransfer.FileTransferConnectionManager
-import java.util.*
-
-/**
- * Created by Antonio García (antonio@openroad.es)
- */
-
-@Composable
-fun FileExplorerScaffoldingScreen(
-    onFileSelected: (String) -> Unit,
-) {
-    val scaffoldState = rememberScaffoldState()
-    val isInfoOpen = remember { mutableStateOf(false) }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("File Explorer") },
-                backgroundColor = TopBarBackground,
-                actions = {
-                    IconButton(onClick = { isInfoOpen.value = true }) {
-                        Icon(
-                            Icons.Outlined.Info,
-                            contentDescription = "Info"
-                        )
-                    }
-                }
-            )
-        },
-        scaffoldState = scaffoldState,
-    ) { innerPadding ->
-        FileExplorerScreen(
-            innerPadding,
-            snackbarHostState = scaffoldState.snackbarHostState,
-            onFileSelected = onFileSelected
-        )
-
-        // Info dialog
-        if (isInfoOpen.value) {
-
-            AlertDialog(
-                onDismissRequest = { isInfoOpen.value = false },
-                contentColor = Color.Black,
-                title = { Text("Info") },
-                text = {
-                    Text("Version: ${BuildConfig.VERSION_NAME} b${BuildConfig.VERSION_CODE}")
-                },
-                confirmButton = {
-                    OutlinedButton(
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Color.Black
-                        ),
-                        border = BorderStroke(1.dp, TabBackground),
-                        onClick = {
-                            isInfoOpen.value = false
-                        }) {
-                        Text("Ok")
-                    }
-                }
-            )
-        }
-    }
-}
+import io.openroad.filetransfer.ConnectionManager
+import io.openroad.wifi.scanner.WifiPeripheralScannerFake
 
 @Composable
 fun FileExplorerScreen(
-    innerPadding: PaddingValues,
+    modifier: Modifier = Modifier,
     viewModel: FileSystemViewModel = viewModel(),
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    connectionManager: ConnectionManager,
+    snackBarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onShowSelectDirectory: (String) -> Unit,
     onFileSelected: (String) -> Unit,
 ) {
-    val mainColor = Color.White.copy(alpha = 0.7f)
-    val fileTransferClient =
-        FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
-    val peripheralName = fileTransferClient.value?.peripheralName
+    val outlineColor = ControlsOutline
     var path by remember { mutableStateOf("/") }
-    val isReconnecting by FileTransferConnectionManager.isSelectedPeripheralReconnecting.collectAsState()
 
+    val fileTransferClient by connectionManager.currentFileTransferClient.collectAsState()
+    val isReconnecting by connectionManager.isReconnectingToCurrentPeripheral.collectAsState()
+    val peripheralName = fileTransferClient?.peripheral?.nameOrAddress
+
+    // Reconnecting snackbar
     LaunchedEffect(isReconnecting) {
         if (isReconnecting) {
-            snackbarHostState.showSnackbar(
-                message = "Reconnecting...",
-                duration = SnackbarDuration.Long
+            snackBarHostState.showSnackbar(
+                message = "Reconnecting...", duration = SnackbarDuration.Long
             )
         }
     }
 
+    // UI
     Column(
-        Modifier
-            .padding(innerPadding)
-            .padding(20.dp),
-        verticalArrangement = spacedBy(12.dp)
+        modifier = modifier.padding(20.dp),
+        verticalArrangement = spacedBy(12.dp),
     ) {
-
         // Top Bars
         Column(verticalArrangement = spacedBy(8.dp)) {
 
             // Peripheral
             Column(
-                verticalArrangement = spacedBy(1.dp)
+                verticalArrangement = spacedBy(2.dp)
             ) {
-                Text(
-                    "Selected Peripheral",
-                    style = MaterialTheme.typography.caption
-                )
+                Text("Selected Peripheral", style = MaterialTheme.typography.labelSmall)
 
                 Button(
                     onClick = { /*TODO*/ },
                     colors = ButtonDefaults.textButtonColors(
-                        backgroundColor = mainColor,
-                        contentColor = Color.Black
+                        containerColor = outlineColor, contentColor = Color.Black
                     ),
+                    shape = RoundedCornerShape(8.dp),
                     enabled = !isReconnecting,
                     modifier = Modifier.height(IntrinsicSize.Min),
                     contentPadding = PaddingValues(8.dp),
@@ -158,10 +96,7 @@ fun FileExplorerScreen(
             ) {
 
                 // Title
-                Text(
-                    "Path",
-                    style = MaterialTheme.typography.caption
-                )
+                Text("Path", style = MaterialTheme.typography.labelSmall)
 
                 Row(
                     modifier = Modifier
@@ -177,34 +112,38 @@ fun FileExplorerScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .align(Alignment.CenterVertically)
-                            .border(BorderStroke(1.dp, mainColor), RoundedCornerShape(4.dp))
+                            .border(BorderStroke(1.dp, outlineColor), RoundedCornerShape(4.dp))
                             .weight(1.0f)
                             .padding(9.dp),
                     )
 
                     // Action Buttons
                     InputTextActionButton(
-                        mainColor = mainColor,
+                        mainColor = outlineColor,
                         buttonIcon = Icons.Outlined.CreateNewFolder,
                         alertText = "New Directory",
                         alertMessage = "Enter name for the new directory",
+                        placeholderText = "Directory name",
+                        actionText = "Create",
                         enabled = !isReconnecting,
                     ) { inputText ->
                         val newDirectoryPath = viewModel.path.value + inputText
-                        fileTransferClient.value?.let { fileTransferClient ->
+                        fileTransferClient?.let { fileTransferClient ->
                             viewModel.makeDirectory(newDirectoryPath, fileTransferClient)
                         }
                     }
 
                     InputTextActionButton(
-                        mainColor = mainColor,
+                        mainColor = outlineColor,
                         buttonIcon = Icons.Outlined.NoteAdd,
                         alertText = "New File",
                         alertMessage = "Enter name for the new file",
+                        placeholderText = "Filename",
+                        actionText = "Create",
                         enabled = !isReconnecting,
                     ) { inputText ->
                         val newFilePath = viewModel.path.value + inputText
-                        fileTransferClient.value?.let { fileTransferClient ->
+                        fileTransferClient?.let { fileTransferClient ->
                             viewModel.makeFile(newFilePath, fileTransferClient)
                         }
                     }
@@ -215,7 +154,7 @@ fun FileExplorerScreen(
         // FileSystem
         Box(
             Modifier
-                .border(BorderStroke(1.dp, mainColor), RoundedCornerShape(4.dp))
+                .border(BorderStroke(1.dp, outlineColor), RoundedCornerShape(4.dp))
                 .clip(RoundedCornerShape(4.dp))
                 .fillMaxWidth()
                 .fillMaxHeight()
@@ -227,19 +166,27 @@ fun FileExplorerScreen(
                     .padding(bottom = 26.dp)        // Extra padding to take into account the bottom status bar
             ) {
                 FileSystemScreen(
+                    connectionManager = connectionManager,
                     path = path,
                     onPathChange = { path = it },
                     showOnlyDirectories = false,
                     isLoading = isReconnecting,
-                    viewModel = viewModel
-                ) { selectedFilePath ->
-                    // on file selected
-                    onFileSelected(selectedFilePath)
-                }
+                    viewModel = viewModel,
+                    onShowSelectDirectory = onShowSelectDirectory,
+                    onFileSelected = onFileSelected,
+                )
             }
+
             // Status bar
+            val lastTransmit by viewModel.lastTransmit.collectAsState()
+            val transmissionProgress by viewModel.transmissionProgress.collectAsState()
+
             Box(Modifier.align(Alignment.BottomStart)) {
-                FileCommandStatusBarView(viewModel = viewModel, backgroundColor = mainColor)
+                FileCommandStatusBarView(
+                    // backgroundColor = outlineColor,
+                    lastTransmit = lastTransmit,
+                    transmissionProgress = transmissionProgress,
+                )
             }
         }
     }
@@ -251,98 +198,62 @@ private fun InputTextActionButton(
     buttonIcon: ImageVector,
     alertText: String,
     alertMessage: String,
+    placeholderText: String,
+    actionText: String,
     enabled: Boolean,
     onNewInputText: (String) -> Unit
 ) {
     val isDialogOpen = remember { mutableStateOf(false) }
-    var inputText by remember { mutableStateOf("") }
 
     // New Directory
     OutlinedButton(
         onClick = {
-            /*if (BuildConfig.DEBUG) {
-                onNewInputText(UUID.randomUUID().toString())
-            } else {*/
             isDialogOpen.value = true
-            // }
         },
         enabled = enabled,
         colors = ButtonDefaults.textButtonColors(
-            backgroundColor = Color.Transparent,
+            containerColor = Color.Transparent,
             contentColor = mainColor,
             disabledContentColor = Color.Gray,
         ),
         border = BorderStroke(1.dp, mainColor),
     ) {
         Icon(
-            buttonIcon,
-            contentDescription = "New Directory"
+            buttonIcon, contentDescription = "New Directory"
         )
     }
 
     // New Directory Alert
     if (isDialogOpen.value) {
-        AlertDialog(
-            onDismissRequest = { isDialogOpen.value = false },
-            contentColor = Color.Black,
-            title = { Text(alertText) },
-            text = {
-                Column(verticalArrangement = spacedBy(8.dp)) {
-                    Text(alertMessage)
-                    TextField(
-                        colors = TextFieldDefaults.textFieldColors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = Color.Black,
-                        ),
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                    )
-                }
-            },
-            confirmButton = {
-                OutlinedButton(
-                    enabled = !inputText.isEmpty(),
-                    colors = ButtonDefaults.textButtonColors(
-                        //backgroundColor = mainColor,
-                        contentColor = Color.Black,
-                    ),
-                    border = BorderStroke(1.dp, TabBackground),
-                    onClick = {
-                        isDialogOpen.value = false
-                        onNewInputText(inputText)
-                    }) {
-                    Text("Create")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    colors = ButtonDefaults.textButtonColors(
-                        //backgroundColor = mainColor,
-                        contentColor = Color.Black
-                    ),
-                    border = BorderStroke(1.dp, TabBackground),
-                    onClick = {
-                        isDialogOpen.value = false
-                    }) {
-                    Text("Cancel")
-                }
+        ConfirmActionDialog(
+            alertText = alertText,
+            alertMessage = alertMessage,
+            placeholderText = placeholderText,
+            actionText = actionText,
+        ) { inputText ->
+            if (inputText != null) {
+                onNewInputText(inputText)
             }
-        )
+            isDialogOpen.value = false
+        }
     }
 }
+
 
 // region Previews
 @Preview(showSystemUi = true)
 @Composable
 private fun FileExplorerScreenPreview() {
     GliderTheme {
+        val connectionManager = ConnectionManager(WifiPeripheralScannerFake())
 
-        BackgroundGradientDefault {
-            FileExplorerScaffoldingScreen() {}
+        BackgroundGradientFillMaxSize {
+            FileExplorerScreen(
+                connectionManager = connectionManager,
+                onShowSelectDirectory = {},
+                onFileSelected = {})
         }
 
     }
 }
 
-//endregion

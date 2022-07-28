@@ -7,11 +7,8 @@ Source code for the iOS app is here: [https://github.com/adafruit/Glider-for-iOS
 
 ## Introduction
 
-Wirelessly transfer files to and from file transfer ready Bluetooth
-Low Energy (BLE) firmware. Browse and edit files from within File
-Glider or use the Files app integration to access the files from other
-apps. Multiple devices can be managed at once and access can be shared
-amongst multiple apps.
+Wirelessly transfer files to and from CircuitPython devices. It supports Bluetooth
+Low Energy (BLE) and Wifi
 
 Compatible devices:
 * nrf52840 boards running CircuitPython 7.0.0+

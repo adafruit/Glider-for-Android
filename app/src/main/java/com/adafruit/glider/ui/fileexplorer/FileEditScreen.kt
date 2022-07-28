@@ -1,14 +1,18 @@
 package com.adafruit.glider.ui.fileexplorer
 
+/**
+ * Created by Antonio García (antonio@openroad.es)
+ */
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,18 +23,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.adafruit.glider.ui.BackgroundGradientDefault
+import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.GliderTheme
-import com.adafruit.glider.ui.theme.TopBarBackground
-import io.openroad.ble.filetransfer.FileTransferConnectionManager
-import io.openroad.ble.utils.filenameFromPath
+import io.openroad.filetransfer.ConnectionManager
+import io.openroad.utils.filenameFromPath
+import io.openroad.wifi.scanner.WifiPeripheralScannerFake
 
-/**
- * Created by Antonio García (antonio@openroad.es)
- */
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileEditScaffoldingScreen(
+    connectionManager: ConnectionManager,
     path: String,
     navController: NavHostController = rememberNavController()
 ) {
@@ -38,11 +40,10 @@ fun FileEditScaffoldingScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text(title) },
-                backgroundColor = TopBarBackground,
-                navigationIcon = if (navController.previousBackStackEntry != null) {
-                    {
+                navigationIcon = {
+                    if (navController.previousBackStackEntry != null) {
                         IconButton(onClick = { navController.navigateUp() }) {
                             Icon(
                                 imageVector = Icons.Filled.ArrowBack,
@@ -50,26 +51,30 @@ fun FileEditScaffoldingScreen(
                             )
                         }
                     }
-                } else {
-                    null
                 }
             )
         },
     ) { innerPadding ->
-        FileEditScreen(path, innerPadding)
+
+        BackgroundGradientFillMaxSize {
+            FileEditScreen(
+                modifier = Modifier.padding(innerPadding),
+                connectionManager = connectionManager,
+                path = path
+            )
+        }
     }
 }
 
 @Composable
 fun FileEditScreen(
+    modifier: Modifier = Modifier,
+    connectionManager: ConnectionManager,
     path: String,
-    innerPadding: PaddingValues = PaddingValues(0.dp),
     viewModel: FileEditViewModel = viewModel(),
 ) {
     // on Appear
-    val fileTransferClient =
-        //(applicationContext as GliderApplication).appContainer.fileTransferClient
-        FileTransferConnectionManager.selectedFileTransferClient.collectAsState()
+    val fileTransferClient = connectionManager.currentFileTransferClient.collectAsState()
 
     LaunchedEffect(Unit) {
         fileTransferClient.value?.let { fileTransferClient ->
@@ -84,7 +89,7 @@ fun FileEditScreen(
     val text by viewModel.text.collectAsState()
 
     val isTransmitting by viewModel.isTransmitting.collectAsState()
-    val isLoading by FileTransferConnectionManager.isSelectedPeripheralReconnecting.collectAsState()
+    val isLoading by connectionManager.isReconnectingToCurrentPeripheral.collectAsState()
     val isInteractionDisabled = isTransmitting || isLoading
     val mainColor = Color.White.copy(alpha = 0.7f)
     var editedText by remember { mutableStateOf("") }
@@ -96,9 +101,8 @@ fun FileEditScreen(
     }
 
     Column(
-        Modifier
+        modifier
             .fillMaxHeight()
-            .padding(innerPadding)
             .padding(20.dp)
     ) {
         Box(
@@ -107,7 +111,7 @@ fun FileEditScreen(
                 .clip(RoundedCornerShape(4.dp))
         ) {
             TextField(
-                value = editedText ?: "",
+                value = editedText,
                 onValueChange = {
                     editedText = it
                 },
@@ -115,7 +119,7 @@ fun FileEditScreen(
                 label = null,
                 shape = RoundedCornerShape(8.dp),
                 colors = TextFieldDefaults.textFieldColors(
-                    backgroundColor = Color.White,
+                    containerColor = Color.White,
                     textColor = Color.Black,
                     cursorColor = Color.Black,
                     focusedIndicatorColor = Color.Transparent, //hide the indicator
@@ -124,10 +128,14 @@ fun FileEditScreen(
             )
 
             // Status bar
+            val lastTransmit by viewModel.lastTransmit.collectAsState()
+            val transmissionProgress by viewModel.transmissionProgress.collectAsState()
+
             Box(Modifier.align(Alignment.BottomStart)) {
                 FileCommandStatusBarView(
-                    viewModel = viewModel,
-                    backgroundColor = Color.Gray.copy(0.8f)
+                    backgroundColor = Color.Gray.copy(0.8f),
+                    lastTransmit = lastTransmit,
+                    transmissionProgress = transmissionProgress,
                 )
             }
 
@@ -158,7 +166,7 @@ fun FileEditScreen(
                 },
                 enabled = !isInteractionDisabled,
                 colors = ButtonDefaults.textButtonColors(
-                    backgroundColor = Color.Transparent,
+                    containerColor = Color.Transparent,
                     contentColor = mainColor,
                     disabledContentColor = Color.Gray,
                 ),
@@ -166,6 +174,7 @@ fun FileEditScreen(
             ) {
                 Icon(
                     if (hasChanged) Icons.Outlined.Save else Icons.Outlined.TaskAlt,
+                    modifier = Modifier.padding(end = 2.dp),
                     contentDescription = "Save"
                 )
 
@@ -178,7 +187,7 @@ fun FileEditScreen(
                 onClick = { editedText = "" },
                 enabled = !isInteractionDisabled,
                 colors = ButtonDefaults.textButtonColors(
-                    backgroundColor = Color.Transparent,
+                    containerColor = Color.Transparent,
                     contentColor = mainColor,
                     disabledContentColor = Color.Gray,
                 ),
@@ -186,27 +195,24 @@ fun FileEditScreen(
             ) {
                 Icon(
                     Icons.Outlined.Delete,
+                    modifier = Modifier.padding(end = 2.dp),
                     contentDescription = "Clear"
                 )
+
+                Text("Clear")
             }
-
-
         }
     }
-
 }
-
 
 // region Previews
 @Preview(showSystemUi = true)
 @Composable
 private fun FileEditScreenPreview() {
+    val connectionManager = ConnectionManager(WifiPeripheralScannerFake())
+
     GliderTheme {
-
-        BackgroundGradientDefault {
-            FileEditScaffoldingScreen("file.txt")
-        }
-
+        FileEditScaffoldingScreen(connectionManager = connectionManager, path = "file.txt")
     }
 }
 //endregion

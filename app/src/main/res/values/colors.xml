@@ -8,6 +8,7 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Glider -->
-    <color name="status_bar_background">#29517E</color>
+
+    <color name="compose_loading_background">#FF2A4665</color>
+
 </resources>

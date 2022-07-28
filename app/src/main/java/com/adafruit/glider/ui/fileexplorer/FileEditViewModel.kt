@@ -1,13 +1,13 @@
 package com.adafruit.glider.ui.fileexplorer
 
-import io.openroad.ble.FileTransferClient
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-
 /**
  * Created by Antonio García (antonio@openroad.es)
  */
+
+import io.openroad.filetransfer.FileTransferClient
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 class FileEditViewModel : FileCommandsViewModel() {
 
