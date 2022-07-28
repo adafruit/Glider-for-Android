@@ -8,6 +8,8 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdManager.ResolveListener
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
+import com.adafruit.glider.utils.LogHandler
 import com.adafruit.glider.utils.LogUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.flowOn
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 
+
 /*
     NSD scanner
     @param serviceType: string containing the protocol and transport layer for this service.
@@ -27,13 +30,18 @@ class NsdServiceInfoScanner(
     context: Context,
     private val serviceType: String,
 ) {
-    // Data
-    var isScanning = false; private set
+    companion object {
+        private val log by LogUtils()
+
+        init {
+            log.addHandler(LogHandler())
+        }
+    }
 
     // Data - Private
-    private val log by LogUtils()
     private var nsdManager: NsdManager? =
         context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
     // To avoid "error 3" when resolving multiple services concurrently, used a fix based on https://stackoverflow.com/questions/616484/how-to-use-concurrentlinkedqueue
     private var isResolving = AtomicBoolean(false)
@@ -44,6 +52,10 @@ class NsdServiceInfoScanner(
         val info: NsdServiceInfo,
         val isLost: Boolean = false,            // if true the service has been lost
     )
+
+    // Data
+    var isScanning = false; private set
+
 
     // region Flow
     val nsdServiceInfoFlow: Flow<NsdScanResult> = callbackFlow {
@@ -144,12 +156,18 @@ class NsdServiceInfoScanner(
                 }
             }
 
+            val multicastLock = wifiManager.createMulticastLock("multicastLock")
+            multicastLock.setReferenceCounted(true)
+            multicastLock.acquire()
+
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
             isScanning = true
 
             awaitClose {
                 nsdManager.stopServiceDiscovery(discoveryListener)
                 isScanning = false
+
+                multicastLock.release()
                 log.info("nsdServiceInfoFlow finished")
             }
         } ?: run {
