@@ -32,6 +32,7 @@ import com.adafruit.glider.ui.components.BackgroundGradient
 import com.adafruit.glider.ui.components.InputTextActionDialog
 import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
+import com.adafruit.glider.ui.theme.WarningBackground
 import com.adafruit.glider.utils.observeAsState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -167,6 +168,7 @@ private fun PeripheralsScreenBody(
     onWifiPeripheralPasswordChanged: ((wifiPeripheral: WifiPeripheral, newPassword: String?) -> Unit)? = null,
 ) {
     val scrollState = rememberScrollState()
+    val isDeleteBondedPeripheralDialogOpen = remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier
@@ -202,7 +204,9 @@ private fun PeripheralsScreenBody(
             peripheralAddressesBeingSetup = peripheralAddressesBeingSetup,
             onSelectPeripheral = onSelectPeripheral,
             onSelectBondedPeripheral = onSelectBondedPeripheral,
-            onDeleteBondedPeripheral = onDeleteBondedPeripheral,
+            onDeleteBondedPeripheral = { address ->
+                isDeleteBondedPeripheralDialogOpen.value = address
+            },
             onOpenWifiDialogSettings = onOpenWifiDialogSettings,
         )
     }
@@ -227,6 +231,45 @@ private fun PeripheralsScreenBody(
                 )
             }
         }
+    }
+
+    // Delete bonded peripheral dialog
+   isDeleteBondedPeripheralDialogOpen.value?.let { address ->
+
+        AlertDialog(
+            onDismissRequest = { isDeleteBondedPeripheralDialogOpen.value = null },
+            title = { Text("Delete bonding information") },
+            containerColor = Color.White,
+            titleContentColor = Color.Black,
+            textContentColor = Color.Black,
+            text = {  Text("Warning: You will not be able to connect to this peripheral until you reset the bonding information on the peripheral too.")  },
+            confirmButton = {
+                OutlinedButton(
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = WarningBackground,
+                        contentColor = Color.White,
+                        disabledContentColor = Color.Gray,
+                    ),
+                    border = BorderStroke(1.dp, Color.Black),
+                    onClick = {
+                        onDeleteBondedPeripheral?.invoke(address)
+                    }) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.Black
+                    ),
+                    border = BorderStroke(1.dp, Color.Black),
+                    onClick = {
+                        isDeleteBondedPeripheralDialogOpen.value = null
+                    }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
 }
