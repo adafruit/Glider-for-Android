@@ -7,6 +7,8 @@ package io.openroad.filetransfer
 import android.util.Base64
 import com.adafruit.glider.utils.LogHandler
 import com.adafruit.glider.utils.LogUtils
+import io.openroad.PeripheralConnectCompletionHandler
+import io.openroad.wifi.model.FileTransferWebApiVersion
 import io.openroad.wifi.network.FileTransferNetworkServiceInterface
 import io.openroad.wifi.network.FileTransferWebDirectoryJsonDeserializer
 import io.openroad.wifi.peripheral.WifiPeripheral
@@ -19,27 +21,69 @@ import retrofit2.Response
 import java.net.URLEncoder
 import java.util.*
 
-
 class WifiFileTransferPeripheral(
     override val peripheral: WifiPeripheral,
+    private val onGetPasswordForHostName: ((name: String, hostName: String) -> String?)?,
 ) : FileTransferPeripheral {
 
     // Data - Private
     companion object {
         private val log by LogUtils()
+        val defaultPassword = "passw0rd"
 
         init {
             log.addHandler(LogHandler())
         }
     }
+
     private val networkInterface =
         FileTransferNetworkServiceInterface(baseUrl = peripheral.baseUrl())
 
     // Params
-    val password = "passw0rd"
-
+    var password = defaultPassword
 
     // region Actions
+
+    override fun connectAndSetup(
+        externalScope: CoroutineScope,
+        connectionTimeout: Int?,
+        completion: PeripheralConnectCompletionHandler
+    ) {
+        getVersion(externalScope = externalScope) { version ->
+            if (version != null) {
+                val savedPassword =
+                    onGetPasswordForHostName?.invoke(version.boardName, version.hostName)
+                if (savedPassword != null) {
+                    password = savedPassword
+                    log.info("hostName: ${version.hostName} savedPassword: '$savedPassword'")
+                } else {
+                    log.info("hostName: ${version.hostName} using default password: '$password'")
+                }
+                completion(true)
+            } else {
+                log.warning("Error retrieving /version.json")
+                completion(false)
+            }
+        }
+    }
+
+    fun getVersion(
+        externalScope: CoroutineScope,
+        completion: (FileTransferWebApiVersion?) -> Unit,
+    ) {
+        // Retrieve hostname from /version.json to check if we already have a saved password
+        externalScope.launch {
+            runCatching {
+                networkInterface.networkService.getVersion()
+            }.onSuccess { version ->
+                completion(version)
+            }.onFailure {
+                log.warning("Error retrieving /version.json")
+                completion(null)
+            }
+        }
+    }
+
     override fun listDirectory(
         externalScope: CoroutineScope,
         path: String,
@@ -188,7 +232,7 @@ class WifiFileTransferPeripheral(
         toPath: String,
         completion: ((Result<Unit>) -> Unit)?
     ) {
-        // TODO
+        // TODO (REST API don't have a move command yet)
         completion?.let { it(Result.failure(Exception("Move command not implemented"))) }
     }
     // endregion
@@ -220,8 +264,7 @@ class WifiFileTransferPeripheral(
         return path.split('/').map {
             if (it != "/") {
                 URLEncoder.encode(it, "UTF-8")
-            }
-            else {
+            } else {
                 it
             }
         }.joinToString("/")

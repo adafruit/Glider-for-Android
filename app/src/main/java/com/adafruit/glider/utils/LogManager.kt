@@ -6,6 +6,7 @@ package com.adafruit.glider.utils
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.logging.Level
@@ -42,19 +43,25 @@ object LogManager {
     }
 
     // Data - Private
-    private val log by LogUtils()
+    //private val log by LogUtils()
     private var _entries =
         MutableStateFlow<MutableList<Entry>>(mutableListOf())
+
+    // Data - Public
     val entries = _entries.asStateFlow()
 
     // region Actions
 
     fun log(entry: Entry) {
-        log.info("log add: ${entry.text}")
+        //log.info("log add: ${entry.text}")
         _entries.value.add(entry)
 
         // Limit entries count
         limitSizeIfNeeded()
+    }
+
+    fun clear() {
+        _entries.update { mutableListOf() }
     }
 
     // endregion

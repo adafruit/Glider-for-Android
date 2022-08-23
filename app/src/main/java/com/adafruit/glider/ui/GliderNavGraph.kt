@@ -4,6 +4,7 @@ package com.adafruit.glider.ui
  * Created by Antonio García (antonio@openroad.es)
  */
 
+import androidx.annotation.RequiresPermission
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -22,18 +23,24 @@ import com.adafruit.glider.ui.scan.ScanScreen
 import com.adafruit.glider.ui.scan.ScanViewModel
 import com.adafruit.glider.ui.startup.StartupScreen
 
+// Config
+val initialDestination = GliderDestinations.ConnectedBottomNavigation.route     // Debug
+//val initialDestination =GliderDestinations.Scan.route,       // GliderDestinations.Startup
+
+@RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
 @Composable
 fun GliderNavGraph(
     appContainer: AppContainer,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    startDestination: String = GliderDestinations.Scan.route,
+    startDestination: String = initialDestination
 ) {
 
     // Navigation Actions
+    /*
     val navigationActions = remember(navController) {
         GliderNavigationActions(navController)
-    }
+    }*/
 
     NavHost(
         navController = navController,
@@ -57,7 +64,16 @@ fun GliderNavGraph(
         // Scan
         composable(GliderDestinations.Scan.route) {
             val scanViewModel: ScanViewModel =
-                viewModel(factory = ScanViewModel.provideFactory(appContainer.connectionManager))
+                viewModel(
+                    factory = ScanViewModel.provideFactory(
+                        connectionManager = appContainer.connectionManager,
+                        isAutoConnectEnabled = true,
+
+                        // TODO: move all management inside ConnectionManager and remove the following callbacks
+                        onBlePeripheralBonded = {name, address ->  TODO() },
+                        onWifiPeripheralGetPasswordForHostName = {  _, hostName -> TODO() },
+                    )
+                )
 
             ScanScreen(viewModel = scanViewModel) { fileTransferClient ->
                 // on device selected -> go to connected
@@ -68,7 +84,6 @@ fun GliderNavGraph(
                         inclusive = true
                     }
                 }
-
             }
         }
 
@@ -76,7 +91,9 @@ fun GliderNavGraph(
         composable(GliderDestinations.ConnectedBottomNavigation.route) {
             ConnectedNavigationScreen(
                 navController = navController,
-                connectionManager = appContainer.connectionManager
+                connectionManager = appContainer.connectionManager,
+                savedBondedBlePeripherals = appContainer.savedBondedBlePeripherals,
+                savedSettingsWifiPeripherals = appContainer.savedSettingsWifiPeripherals,
             )
         }
 
@@ -115,21 +132,20 @@ fun GliderNavGraph(
                             toPath = selectedPath,
                             fileTransferClient = fileTransferClient
                         ) { result ->
-                           result.fold(
-                               onSuccess = {
-                                   navController.popBackStack()
-                               },
-                               onFailure = {
-                                   // Do nothing
-                               }
-                           )
+                            result.fold(
+                                onSuccess = {
+                                    navController.popBackStack()
+                                },
+                                onFailure = {
+                                    // Do nothing
+                                }
+                            )
 
                         }
                     } ?: run {
                         navController.popBackStack()
                     }
-                }
-                else {
+                } else {
                     navController.popBackStack()
                 }
             }

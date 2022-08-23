@@ -1,14 +1,23 @@
 package io.openroad.filetransfer
 
 import io.openroad.Peripheral
+import io.openroad.PeripheralConnectCompletionHandler
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
 import java.util.*
 
+// TypeAlias
 typealias FileTransferProgressHandler = (transmittedBytes: Int, totalBytes: Int) -> Unit
 
 interface FileTransferPeripheral {
     val peripheral: Peripheral
+
+    // onSetupDataReceived: will be called when a Bluetooth peripheral is bonded or when a Wifi peripheral hostname is resolved
+    fun connectAndSetup(
+        externalScope: CoroutineScope,
+        connectionTimeout: Int? = null,
+        //onSetupDataReceived: (name: String?, address: String) -> Unit,
+        completion: PeripheralConnectCompletionHandler
+    )
 
     fun listDirectory(
         externalScope: CoroutineScope,

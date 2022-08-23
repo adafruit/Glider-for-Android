@@ -17,17 +17,17 @@ import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
-import com.adafruit.glider.ui.theme.WarningBackground
+import io.openroad.ble.scanner.BlePeripheralScannerFake
 import io.openroad.filetransfer.ConnectionManager
 import io.openroad.wifi.scanner.WifiPeripheralScannerFake
 
@@ -129,7 +129,7 @@ private fun SelectDirectoryBody(
 
 
         // FileSystem
-        val isReconnecting by connectionManager.isReconnectingToCurrentPeripheral.collectAsState()
+        val isReconnecting by connectionManager.isReconnectingToBondedPeripherals.collectAsState()
 
         Box(
             Modifier
@@ -210,7 +210,7 @@ private fun SelectDirectoryBody(
 @Preview(showSystemUi = true)
 @Composable
 private fun SelectDirectoryScreenPreview() {
-    val connectionManager = ConnectionManager(WifiPeripheralScannerFake())
+    val connectionManager = ConnectionManager(LocalContext.current, BlePeripheralScannerFake(), WifiPeripheralScannerFake())
 
     GliderTheme {
         SelectDirectoryScreen(

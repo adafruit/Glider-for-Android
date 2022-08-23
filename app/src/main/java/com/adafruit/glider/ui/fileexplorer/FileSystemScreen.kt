@@ -38,11 +38,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
-import com.adafruit.glider.ui.components.ConfirmActionDialog
+import com.adafruit.glider.ui.components.InputTextActionDialog
 import com.adafruit.glider.ui.theme.BackgroundDefault
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.WarningBackground
-import com.adafruit.glider.utils.gesturesDisabled
+import com.adafruit.glider.ui.components.gesturesDisabled
+import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.filetransfer.ConnectionManager
 import io.openroad.filetransfer.DirectoryEntry
 
@@ -135,15 +136,20 @@ fun FileSystemScreen(
         // Actions dialog
         fileTransferClient?.let { fileTransferClient ->
             actionDialogEntry.value?.let { entry ->
+                // Move is only available for Ble Peripherals (REST API doesn't include the move command)
+                val onMove = if (fileTransferClient.peripheral is BlePeripheral) {
+                    {
+                        actionDialogEntry.value = null
+                        onShowSelectDirectory(path)
+                    }
+                } else null
+
                 FileActionsDialog(
                     onRename = {
                         actionDialogEntry.value = null
                         renameDialogEntry.value = entry
                     },
-                    onMove = {
-                        actionDialogEntry.value = null
-                        onShowSelectDirectory(path)
-                    },
+                    onMove = onMove,
                     onDelete = {
                         actionDialogEntry.value = null
                         viewModel.delete(entry, fileTransferClient) {}
@@ -152,7 +158,7 @@ fun FileSystemScreen(
             }
 
             renameDialogEntry.value?.let { entry ->
-                ConfirmActionDialog(
+                InputTextActionDialog(
                     alertText = "Rename",
                     alertMessage = "Enter new name for '${entry.name}'",
                     placeholderText = "New name",
@@ -372,9 +378,9 @@ private fun FileSystemEntry(
 
 @Composable
 fun FileActionsDialog(
-    onRename: () -> Unit,
-    onMove: () -> Unit,
-    onDelete: () -> Unit,
+    onRename: (() -> Unit)?,
+    onMove: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
     onDismiss: () -> Unit
 ) {
     // TODO: update to material3
@@ -390,50 +396,34 @@ fun FileActionsDialog(
                     .defaultMinSize(minWidth = 200.dp),
                 verticalArrangement = spacedBy(4.dp)
             ) {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onRename() },
-                    colors = ButtonDefaults.outlinedButtonColors()//(contentColor = BackgroundDefault)
-                ) {
-                    /*Icon(
-                        tint = Color.White,
-                        imageVector = Icons.Outlined.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 4.dp)
-                    )*/
-
-                    Text("Rename")//, color = BackgroundDefault)
+                onRename?.let {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { it() },
+                        colors = ButtonDefaults.outlinedButtonColors()//(contentColor = BackgroundDefault)
+                    ) {
+                        Text("Rename")
+                    }
                 }
 
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onMove() },
-                    colors = ButtonDefaults.outlinedButtonColors()
-                ) {
-                    /*Icon(
-                        tint = Color.White,
-                        imageVector = Icons.Outlined.DriveFileMove,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 4.dp)
-                    )*/
-
-                    Text("Move")
+                onMove?.let {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { it() },
+                        colors = ButtonDefaults.outlinedButtonColors()
+                    ) {
+                        Text("Move")
+                    }
                 }
 
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onDelete() },
-                    colors = ButtonDefaults.buttonColors(containerColor = WarningBackground)
-                ) {
-
-                    /* Icon(
-                         tint = Color.White,
-                         imageVector = Icons.Outlined.DeleteForever,
-                         contentDescription = null,
-                         modifier = Modifier.padding(end = 4.dp)
-                     )*/
-
-                    Text("Delete", color = Color.White)
+                onDelete?.let {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { it() },
+                        colors = ButtonDefaults.buttonColors(containerColor = WarningBackground)
+                    ) {
+                        Text("Delete", color = Color.White)
+                    }
                 }
             }
         }

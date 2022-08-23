@@ -3,8 +3,7 @@ name: Build debug app APK
 on:
   push:
     branches:
-      - main
-      - wifi_test
+      - '**'
     pull_request:
       - main
 

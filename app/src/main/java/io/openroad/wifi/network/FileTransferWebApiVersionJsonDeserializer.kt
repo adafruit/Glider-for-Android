@@ -24,8 +24,8 @@ class FileTransferWebApiVersionJsonDeserializer : JsonDeserializer<FileTransferW
         val buildDate = dateFormatter.parse(json["build_date"].asString)
         val boardName = json["board_name"].asString
         val mcuName = json["mcu_name"].asString
-        val boardId = json["boardId"].asString
-        val creatorId = json["board_id"].asInt
+        val boardId = json["board_id"].asString
+        val creatorId = json["creator_id"].asInt
         val creationId = json["creation_id"].asInt
         val hostName = json["hostname"].asString
         val port = json["port"].asInt

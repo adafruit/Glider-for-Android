@@ -1,5 +1,9 @@
 package com.adafruit.glider.ui.components
 
+/**
+ * Created by Antonio García (antonio@openroad.es)
+ */
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,16 +16,17 @@ import androidx.compose.ui.unit.dp
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.utils.TextFieldNoPadding
 
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConfirmActionDialog(
+fun InputTextActionDialog(
     alertText: String,
     alertMessage: String,
     placeholderText: String,
+    currentText: String= "",
     actionText: String,
     onAction: (String?) -> Unit,            // returns the text or null if cancel was pressed
 ) {
-    var inputText by remember { mutableStateOf(TextFieldValue("")) }
+    var inputText by remember { mutableStateOf(TextFieldValue(currentText)) }
 
     AlertDialog(
         onDismissRequest = { onAction(null) },
@@ -76,9 +81,9 @@ fun ConfirmActionDialog(
 
 @Preview(showSystemUi = true)
 @Composable
-private fun ActionDialogPreview() {
+private fun InputTextActionDialogPreview() {
     GliderTheme {
-        ConfirmActionDialog(
+        InputTextActionDialog(
             alertText = "New Directory",
             alertMessage = "Enter name for the new directory",
             placeholderText = "Directory name",

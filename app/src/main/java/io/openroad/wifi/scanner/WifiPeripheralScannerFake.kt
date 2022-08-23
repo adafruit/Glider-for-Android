@@ -23,7 +23,7 @@ class WifiPeripheralScannerFake(
             initialValue = null
         )
     override val wifiPeripherals: StateFlow<List<WifiPeripheral>> =
-        flow { emit(emptyList<WifiPeripheral>()) }
+        flow<List<WifiPeripheral>> { emit(emptyList()) }
             .stateIn(
                 scope = externalScope,
                 started = WhileSubscribed(5000L),
@@ -34,8 +34,8 @@ class WifiPeripheralScannerFake(
     override val wifiPeripheralsFlow: Flow<List<WifiPeripheral>> =
         emptyFlow()
 
-
+    /*
     override fun start() {}
 
-    override fun stop() {}
+    override fun stop() {}*/
 }

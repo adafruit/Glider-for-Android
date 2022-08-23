@@ -12,20 +12,21 @@ data class WifiPeripheral(
     override val nameOrAddress: String = name ?: address,
     val port: Int,
 
-    override val createdMillis: Long = System.currentTimeMillis()
+    override val createdMillis: Long = System.currentTimeMillis(),
 ) : Peripheral {
 
     fun baseUrl(): String {
-        var baseUrl = "http://" + address
+        var baseUrl = "http://$address"
         if (port != 80) {
-            baseUrl += ":" + port
+            baseUrl += ":$port"
         }
 
         return baseUrl
     }
 
+    //override val type = Peripheral.Type.Wifi
 
     override fun disconnect(cause: Throwable?) {
-        TODO("Not yet implemented")
+        /* Nothing to do */
     }
 }

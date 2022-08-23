@@ -50,6 +50,6 @@ sealed class GliderDestinations(val route: String) {
 /**
  * Models the navigation actions in the app.
  */
+/*
 class GliderNavigationActions(navController: NavHostController) {
-
-}
+}*/

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 
 // Based on answers from: https://stackoverflow.com/questions/68600128/remove-default-padding-on-jetpack-compose-textfield
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TextFieldNoPadding(
     value: TextFieldValue,

@@ -11,6 +11,7 @@ import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import com.adafruit.glider.utils.LogHandler
 import com.adafruit.glider.utils.LogUtils
+import io.openroad.ble.utils.BleScanException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
-
 
 /*
     NSD scanner
@@ -41,7 +41,7 @@ class NsdServiceInfoScanner(
     // Data - Private
     private var nsdManager: NsdManager? =
         context.getSystemService(Context.NSD_SERVICE) as NsdManager
-    val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
+    private val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
     // To avoid "error 3" when resolving multiple services concurrently, used a fix based on https://stackoverflow.com/questions/616484/how-to-use-concurrentlinkedqueue
     private var isResolving = AtomicBoolean(false)
@@ -156,10 +156,12 @@ class NsdServiceInfoScanner(
                 }
             }
 
+            // Multicast permission due to some bugs with NsdManager: https://stackoverflow.com/questions/53615125/nsdmanager-discovery-does-not-work-on-android-9
             val multicastLock = wifiManager.createMulticastLock("multicastLock")
             multicastLock.setReferenceCounted(true)
             multicastLock.acquire()
 
+            // Start discovery
             nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
             isScanning = true
 
@@ -168,10 +170,10 @@ class NsdServiceInfoScanner(
                 isScanning = false
 
                 multicastLock.release()
-                log.info("nsdServiceInfoFlow finished")
+                //log.info("nsdServiceInfoFlow finished")
             }
         } ?: run {
-            cancel("nsdServiceInfoFlow cannot start")
+            cancel("nsdServiceInfoFlow cannot start", NsdException("NSD service cannot start"))
         }
     }.flowOn(Dispatchers.Main.immediate)        // Call startScan on MainThread
 

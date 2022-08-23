@@ -1,77 +1,108 @@
 package io.openroad.filetransfer
 
+import com.adafruit.glider.utils.LogUtils
 import io.openroad.Peripheral
+import io.openroad.ble.peripheral.BlePeripheral
+import io.openroad.ble.scanner.BlePeripheralScanner
+import io.openroad.ble.scanner.isManufacturerAdafruit
 import io.openroad.wifi.peripheral.WifiPeripheral
 import io.openroad.wifi.scanner.WifiPeripheralScanner
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import java.util.*
+
+const val kMinRssiToAutoConnect = -90//-80                   // in dBM
+const val isWifiScanEnabled = true
+const val isBleScanEnabled = true
 
 class Scanner(
+    private val blePeripheralScanner: BlePeripheralScanner,
     private val wifiPeripheralScanner: WifiPeripheralScanner,
     private val externalScope: CoroutineScope = MainScope(),
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val connect: (wifiPeripheral: WifiPeripheral, completion: (FileTransferClient?) -> Unit) -> Unit
 ) {
     sealed class ScanningState {
         object Idle : ScanningState()
         data class Scanning(val peripherals: List<Peripheral>) : ScanningState()
         data class ScanningError(val cause: Throwable) : ScanningState()
-        data class PreparingConnection(
-            val peripherals: List<Peripheral>,
-            val selectedPeripheral: Peripheral
-        ) : ScanningState()
-
-        data class Connecting(val peripheral: Peripheral) : ScanningState()
-        data class Connected(val client: FileTransferClient) : ScanningState()
-        data class FileTransferEnabled(val client: FileTransferClient) : ScanningState()
     }
 
     // Data - Private
-    private var scanningStateJob: Job? = null
-    private var delayBeforeConnectingJob: Job? = null
+    private val log by LogUtils()
+    private var scanningStateWifiJob: Job? = null
+    private var scanningStateBleJob: Job? = null
+
     private var scanningExceptionDetectorJob: Job? = null
 
     private var _scanningState = MutableStateFlow<ScanningState>(ScanningState.Idle)
-    private var scannedWifiPeripherals = wifiPeripheralScanner.wifiPeripherals
 
-    //private var autoConnectSelectedPeripheral: WifiPeripheral? =  null   // Selected peripheral, awaiting minTimeDetectingPeripheralForAutoConnect to expire to be connected
-
+    private var scannedWifiPeripherals: List<WifiPeripheral> =
+        emptyList()     // Cached list of peripherals
+    private var scannedBlePeripherals: List<BlePeripheral> =
+        emptyList()     // Cached list of peripherals
 
     // Data - Public
-    var isAutoConnectEnabled = true
-    var minTimeDetectingPeripheralForAutoConnect = 4500L     // in millis
-
-    var isScanning = wifiPeripheralScanner.isRunning
+    var isScanning = wifiPeripheralScanner.isRunning || blePeripheralScanner.isRunning
     val scanningState = _scanningState.asStateFlow()
+
 
     // region Actions
     fun startScan() {
         // Clean
-        delayBeforeConnectingJob?.cancel()
+        //delayBeforeConnectingJob?.cancel()
         _scanningState.update { ScanningState.Scanning(emptyList()) }
 
-        // Start Wifi scan
-        wifiPeripheralScanner.start()
-
-        scanningStateJob = scannedWifiPeripherals
-            .onEach { wifiPeripherals ->
-                if (scanningState.value !is ScanningState.Scanning) return@onEach
-
-                _scanningState.update { ScanningState.Scanning(wifiPeripherals) }
-
-                if (isAutoConnectEnabled) {// && autoConnectSelectedPeripheral == null) {
-                    wifiPeripherals.firstOrNull()?.let { selectedPeripheral ->
-                        //autoConnectSelectedPeripheral = selectedPeripheral
-                        delayedConnect(
-                            peripherals = wifiPeripherals,
-                            selectedPeripheral = selectedPeripheral,
-                            delay = minTimeDetectingPeripheralForAutoConnect
-                        )
-                    }
+        // Start Wifi Scan
+        if (isWifiScanEnabled) {
+            scanningStateWifiJob = wifiPeripheralScanner.wifiPeripheralsFlow
+                .onStart { log.info("wifiPeripheralsFlow start") }
+                .onEach { wifiPeripherals ->
+                    scannedWifiPeripherals = wifiPeripherals.sortedBy { it.createdMillis }
+                    updateScanningState()
                 }
-            }
-            .flowOn(defaultDispatcher)
-            .launchIn(externalScope)
+                .onCompletion { exception ->
+                    val cause = exception?.cause
+                    log.info("wifiPeripheralsFlow completion: $cause")
+                }
+                .flowOn(defaultDispatcher)
+                .launchIn(externalScope)
+        }
+
+        // Start Bluetooth Scan
+        if (isBleScanEnabled) {
+            scanningStateBleJob = blePeripheralScanner.blePeripheralsFlow
+                .onStart { log.info("blePeripheralsFlow start") }
+                .onEach { blePeripherals ->
+                    val filteredPeripherals = blePeripherals
+                        // Only peripherals that are manufactured by Adafruit
+                        .filter { blePeripheral ->
+                            blePeripheral.scanRecord()?.isManufacturerAdafruit() ?: false
+                        }
+                        // Only peripherals than include the FileTransfer service
+                        .filter { blePeripheral ->
+                            val serviceUuids: List<UUID>? =
+                                blePeripheral.scanRecord()?.serviceUuids?.map { it.uuid }
+                            serviceUuids?.contains(kFileTransferServiceUUID) ?: false
+                        }
+                        /*.map {
+                            log.info("found: ${it.nameOrAddress} -> rssi: ${it.rssi.value}")
+                            it
+                        }*/
+                        // Only peripherals that are closer than kMinRssiToAutoConnect
+                        .filter { it.rssi.value > kMinRssiToAutoConnect }
+
+                    scannedBlePeripherals = filteredPeripherals.sortedBy { it.createdMillis }
+                    updateScanningState()
+                }
+                .onCompletion { exception ->
+                    val cause = exception?.cause
+                    log.info("blePeripheralsFlow completion: $cause")
+                }
+                .flowOn(defaultDispatcher)
+                .launchIn(externalScope)
+        }
+
+/*
 
         // Listen to scanning errors and map it to the UI state
         scanningExceptionDetectorJob = externalScope.launch {
@@ -79,60 +110,31 @@ class Scanner(
                 .filterNotNull()
                 .collect { wifiException ->
                     _scanningState.update {
-                        Scanner.ScanningState.ScanningError(wifiException)
+                        ScanningState.ScanningError(wifiException)
                     }
                     stopScan()
                 }
         }
+*/
+    }
+
+    /*
+        Update scanning state merging results from wifi peripherals and bluetooth peripherals
+     */
+    @Synchronized
+    private fun updateScanningState() {
+        val allPeripherals = scannedWifiPeripherals + scannedBlePeripherals
+        _scanningState.update { ScanningState.Scanning(allPeripherals) }
     }
 
     fun stopScan() {
         // Clean
-        scanningStateJob?.cancel()
-        delayBeforeConnectingJob?.cancel()
+        scanningStateWifiJob?.cancel()
+        scanningStateWifiJob = null
+        scanningStateBleJob?.cancel()
+        scanningStateBleJob = null
+
         scanningExceptionDetectorJob?.cancel()
         scanningExceptionDetectorJob = null
-        //autoConnectSelectedPeripheral = null
-
-        // Stop Wifi scan
-        wifiPeripheralScanner.stop()
-    }
-
-    private fun delayedConnect(
-        peripherals: List<WifiPeripheral>,
-        selectedPeripheral: WifiPeripheral,
-        delay: Long
-    ) {
-        delayBeforeConnectingJob?.cancel()
-
-        _scanningState.update {
-            ScanningState.PreparingConnection(
-                peripherals,
-                selectedPeripheral
-            )
-        }
-
-        // Wait
-        externalScope.launch {
-            delayBeforeConnectingJob = async(defaultDispatcher) {
-                delay(delay)
-                if (isActive) {
-
-                    // Connect
-                    delayBeforeConnectingJob?.cancel()
-                    stopScan()
-                    _scanningState.update { ScanningState.Connecting(selectedPeripheral) }
-                    connect(selectedPeripheral) { fileTransferClient ->
-                        _scanningState.update {
-                            if (fileTransferClient != null) {
-                                ScanningState.FileTransferEnabled(fileTransferClient)
-                            } else {
-                                ScanningState.ScanningError(Exception("Error connecting to: ${selectedPeripheral.nameOrAddress}"))
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }

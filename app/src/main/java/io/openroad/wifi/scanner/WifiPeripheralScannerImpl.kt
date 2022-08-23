@@ -7,6 +7,7 @@ package io.openroad.wifi.scanner
 import android.content.Context
 import io.openroad.wifi.peripheral.WifiPeripheral
 import com.adafruit.glider.utils.LogUtils
+import io.openroad.ble.utils.BleException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,8 +21,8 @@ import kotlinx.coroutines.flow.*
 class WifiPeripheralScannerImpl(
     context: Context,
     serviceType: String,
-    private val externalScope: CoroutineScope,
-    private val defaultDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    //private val externalScope: CoroutineScope,
+    //private val defaultDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : WifiPeripheralScanner {
 
     // Data - Private
@@ -39,9 +40,16 @@ class WifiPeripheralScannerImpl(
     override val wifiLastException = _wifiLastException.asStateFlow()
     override val wifiPeripherals = _wifiPeripherals.asStateFlow()
 
+
     // Cold flow independent from start() stop()
     override val wifiPeripheralsFlow: Flow<List<WifiPeripheral>> =
         nsdServiceInfoScanner.nsdServiceInfoFlow
+            .catch { exception ->
+                val cause = exception.cause as? NsdException
+                if (cause != null) {
+                    _wifiLastException.update { cause }
+                }
+            }
             .transform { scanResult ->
                 // Update peripherals
                 updateWifiPeripheralsWithScanResult(scanResult)
@@ -49,6 +57,7 @@ class WifiPeripheralScannerImpl(
                 emit(knownWifiPeripherals.toList())
             }
 
+/*
     // region Actions
     override fun start() {
         if (isRunning) {
@@ -68,8 +77,7 @@ class WifiPeripheralScannerImpl(
                 // Update state
                 _wifiPeripherals.update { knownWifiPeripherals.toList() }
             }
-            /*.onStart {
-            }*/
+            /*.onStart{}*/
             .onCompletion { exception ->
                 val cause = exception?.cause
                 if (cause is NsdScanException) {
@@ -93,14 +101,14 @@ class WifiPeripheralScannerImpl(
         scanJob = null
     }
     // endregion
-
+*/
     // region Utils
     @Synchronized
     private fun updateWifiPeripheralsWithScanResult(scanResult: NsdServiceInfoScanner.NsdScanResult) {
         val serviceInfo = scanResult.info
 
         // Only consider it if hostAddress is not null
-        val hostAddress = serviceInfo.host.hostAddress ?: return
+        val hostAddress = serviceInfo.host?.hostAddress ?: return
 
         val existingPeripheral =
             knownWifiPeripherals.firstOrNull { it.address == hostAddress }

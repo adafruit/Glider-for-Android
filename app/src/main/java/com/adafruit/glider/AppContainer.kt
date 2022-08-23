@@ -5,7 +5,12 @@ package com.adafruit.glider
  */
 
 import android.content.Context
+import io.openroad.Peripheral
+import io.openroad.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.ble.scanner.BlePeripheralScanner
+import io.openroad.ble.scanner.BlePeripheralScannerImpl
 import io.openroad.filetransfer.ConnectionManager
+import io.openroad.wifi.peripheral.SavedSettingsWifiPeripherals
 import io.openroad.wifi.scanner.WifiPeripheralScanner
 import io.openroad.wifi.scanner.WifiPeripheralScannerImpl
 import kotlinx.coroutines.MainScope
@@ -14,8 +19,11 @@ import kotlinx.coroutines.MainScope
  * Dependency Injection container at the application level.
  */
 interface AppContainer {
+    val blePeripheralScanner: BlePeripheralScanner
     val wifiPeripheralScanner: WifiPeripheralScanner
     val connectionManager: ConnectionManager
+    val savedBondedBlePeripherals: SavedBondedBlePeripherals
+    val savedSettingsWifiPeripherals: SavedSettingsWifiPeripherals
 }
 
 /**
@@ -24,17 +32,46 @@ interface AppContainer {
  * Variables are initialized lazily and the same instance is shared across the whole app.
  */
 class AppContainerImpl(private val applicationContext: Context) : AppContainer {
+    override val blePeripheralScanner: BlePeripheralScanner by lazy {
+        BlePeripheralScannerImpl(
+            context = applicationContext,
+            scanFilters = null,
+            externalScope = MainScope()
+        )
+    }
+
     override val wifiPeripheralScanner: WifiPeripheralScanner by lazy {
         WifiPeripheralScannerImpl(
             context = applicationContext,
             serviceType = "_circuitpython._tcp.",
-            externalScope = MainScope()
         )
     }
 
     override val connectionManager: ConnectionManager by lazy {
         ConnectionManager(
-            wifiPeripheralScanner = wifiPeripheralScanner
+            context = applicationContext,
+            blePeripheralScanner = blePeripheralScanner,
+            wifiPeripheralScanner = wifiPeripheralScanner,
+            onBlePeripheralBonded = { name, address ->
+                // Bluetooth peripheral -> Save bluetooth address when bonded to be able to reconnect later
+                savedBondedBlePeripherals.add(name, address)
+            },
+            onWifiPeripheralGetPasswordForHostName = { _, hostName ->
+                // Wifi peripheral -> Get saved password
+                savedSettingsWifiPeripherals.getPassword(hostName)
+            },
+        )
+    }
+
+    override val savedBondedBlePeripherals: SavedBondedBlePeripherals by lazy {
+        SavedBondedBlePeripherals(
+            context = applicationContext
+        )
+    }
+
+    override val savedSettingsWifiPeripherals: SavedSettingsWifiPeripherals by lazy {
+        SavedSettingsWifiPeripherals(
+            context = applicationContext
         )
     }
 }

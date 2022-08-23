@@ -9,7 +9,7 @@ import kotlinx.coroutines.MainScope
 import java.util.*
 
 class FileTransferClient(
-    private val fileTransferPeripheral: FileTransferPeripheral,
+    val fileTransferPeripheral: FileTransferPeripheral,
 ) {
     val peripheral: Peripheral = fileTransferPeripheral.peripheral
 
