@@ -6,7 +6,9 @@ package com.adafruit.glider.ui.connected
 
 import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement.Center
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +44,7 @@ import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.ble.utils.BleManager
 import io.openroad.wifi.peripheral.WifiPeripheral
 import kotlinx.coroutines.launch
+import kotlin.text.Typography
 
 @OptIn(ExperimentalPermissionsApi::class)
 @RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
@@ -234,7 +237,7 @@ private fun PeripheralsScreenBody(
     }
 
     // Delete bonded peripheral dialog
-   isDeleteBondedPeripheralDialogOpen.value?.let { address ->
+    isDeleteBondedPeripheralDialogOpen.value?.let { address ->
 
         AlertDialog(
             onDismissRequest = { isDeleteBondedPeripheralDialogOpen.value = null },
@@ -242,7 +245,7 @@ private fun PeripheralsScreenBody(
             containerColor = Color.White,
             titleContentColor = Color.Black,
             textContentColor = Color.Black,
-            text = {  Text("Warning: You will not be able to connect to this peripheral until you reset the bonding information on the peripheral too.")  },
+            text = { Text("Warning: You will not be able to connect to this peripheral until you reset the bonding information on the peripheral too.") },
             confirmButton = {
                 OutlinedButton(
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -302,12 +305,11 @@ private fun PeripheralsListByType(
             Column(
                 Modifier.fillMaxWidth(),
                 verticalArrangement = spacedBy(12.dp),
-                //horizontalAlignment = CenterHorizontally,
             ) {
                 Text(
                     modifier = Modifier
                         .padding(bottom = 4.dp),
-                    text = "Wifi".uppercase(),
+                    text = "Wifi ".uppercase(),
                     style = MaterialTheme.typography.labelMedium
                 )
 
@@ -407,6 +409,7 @@ private fun BlePeripheralsList(
 
         PeripheralButton(
             name = name,
+            details = null,
             address = address,
             isSelected = isSelected,
             state = state,
@@ -435,6 +438,7 @@ private fun BondedBlePeripheralsList(
 
         PeripheralButton(
             name = name,
+            details = null,
             address = address,
             isSelected = isSelected,
             state = state,
@@ -464,6 +468,7 @@ private fun WifiPeripheralsList(
 
         PeripheralButton(
             name = name,
+            details = "IP: $address",
             address = address,
             isSelected = isSelected,
             state = state,
@@ -485,6 +490,7 @@ private sealed class PeripheralButtonState {
 @Composable
 private fun PeripheralButton(
     name: String,
+    details: String?,
     address: String,
     isSelected: Boolean,
     state: PeripheralButtonState,
@@ -514,8 +520,9 @@ private fun PeripheralButton(
             ) {
                 PeripheralName(
                     name = name,
+                    details = details,
                     isSelected = isSelected,
-                    state = state
+                    state = state,
                 )
             }
         } else {
@@ -533,8 +540,9 @@ private fun PeripheralButton(
             ) {
                 PeripheralName(
                     name = name,
+                    details = details,
                     isSelected = isSelected,
-                    state = state
+                    state = state,
                 )
             }
         }
@@ -570,6 +578,7 @@ private fun PeripheralButton(
 @Composable
 private fun PeripheralName(
     name: String,
+    details: String?,
     isSelected: Boolean,
     state: PeripheralButtonState,
 ) {
@@ -578,26 +587,30 @@ private fun PeripheralName(
         verticalAlignment = Alignment.CenterVertically,
     ) {
 
-        Text(
-            name,
-            modifier = Modifier.weight(1f),//.border(BorderStroke(1.dp, Color.Red), RoundedCornerShape(4.dp)),
-            textAlign = TextAlign.Left,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                name,
+                modifier = Modifier.wrapContentHeight(),//.border(BorderStroke(1.dp, Color.Red), RoundedCornerShape(4.dp)),
+                textAlign = TextAlign.Left,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+            )
+
+            details?.let {
+                Text(
+                    details,
+                    textAlign = TextAlign.Left,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
 
         when (state) {
-            /*
-            PeripheralButtonState.Delete -> {
-                Icon(
-                    Icons.Outlined.Delete,
-                    contentDescription = "Delete"
-                )
-            }*/
             PeripheralButtonState.Wait -> {
                 CircularProgressIndicator(
                     color = Color.White,
                     strokeWidth = 2.dp,
                     modifier = Modifier
+                        .offset(x = 12.dp)      // Offset because there a big trailing padding to the button border
                         .size(18.dp)
                 )
             }
