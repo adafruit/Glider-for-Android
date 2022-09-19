@@ -80,7 +80,7 @@ class BleFileTransferPeripheral(
     // Data
     val address = peripheral.address
     val nameOrAddress = peripheral.nameOrAddress
-    val connectionState = peripheral.connectionState
+    //val connectionState = peripheral.connectionState
 
     // States
     sealed class FileTransferState {
@@ -162,7 +162,6 @@ class BleFileTransferPeripheral(
     override fun connectAndSetup(
         externalScope: CoroutineScope,
         connectionTimeout: Int?,
-        //onSetupDataReceived: (name: String?, address: String) -> Unit,
         completion: PeripheralConnectCompletionHandler
     ) {
         disable()

@@ -27,7 +27,6 @@ import com.adafruit.glider.ui.startup.StartupScreen
 val initialDestination = GliderDestinations.ConnectedBottomNavigation.route     // Debug
 //val initialDestination =GliderDestinations.Scan.route,       // GliderDestinations.Startup
 
-@RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
 @Composable
 fun GliderNavGraph(
     appContainer: AppContainer,
@@ -35,13 +34,6 @@ fun GliderNavGraph(
     navController: NavHostController = rememberNavController(),
     startDestination: String = initialDestination
 ) {
-
-    // Navigation Actions
-    /*
-    val navigationActions = remember(navController) {
-        GliderNavigationActions(navController)
-    }*/
-
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -89,6 +81,7 @@ fun GliderNavGraph(
 
         // ConnectedBottomNavigation
         composable(GliderDestinations.ConnectedBottomNavigation.route) {
+
             ConnectedNavigationScreen(
                 navController = navController,
                 connectionManager = appContainer.connectionManager,

@@ -49,7 +49,7 @@ class SavedSettingsWifiPeripherals(
             }
 
             peripherals.add(Settings(name, hostName, password))
-            setBondedPeripherals(peripherals)
+            setPeripheralsSettings(peripherals)
         }
     }
 
@@ -59,11 +59,11 @@ class SavedSettingsWifiPeripherals(
         if (existingPeripheral != null) {
             peripherals.remove(existingPeripheral)
         }
-        setBondedPeripherals(peripherals)
+        setPeripheralsSettings(peripherals)
     }
 
     fun clear() {
-        setBondedPeripherals(emptyList())
+        setPeripheralsSettings(emptyList())
     }
     // endregion
 
@@ -79,9 +79,9 @@ class SavedSettingsWifiPeripherals(
         }
     }
 
-    private fun setBondedPeripherals(peripherals: List<Settings>) {
+    private fun setPeripheralsSettings(settings: List<Settings>) {
         with(sharedPreferences.edit()) {
-            val jsonString = Gson().toJson(peripherals)
+            val jsonString = Gson().toJson(settings)
             putString(kSharedPreferences_settings, jsonString)
             apply()
         }

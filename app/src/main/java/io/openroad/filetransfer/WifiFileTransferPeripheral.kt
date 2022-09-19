@@ -18,7 +18,6 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
-import java.net.URLEncoder
 import java.util.*
 
 class WifiFileTransferPeripheral(
@@ -29,7 +28,7 @@ class WifiFileTransferPeripheral(
     // Data - Private
     companion object {
         private val log by LogUtils()
-        val defaultPassword = "passw0rd"
+        const val defaultPassword = "passw0rd"
 
         init {
             log.addHandler(LogHandler())
@@ -49,6 +48,8 @@ class WifiFileTransferPeripheral(
         connectionTimeout: Int?,
         completion: PeripheralConnectCompletionHandler
     ) {
+        // TODO: apply connectionTimeout
+
         getVersion(externalScope = externalScope) { version ->
             if (version != null) {
                 val savedPassword =
@@ -107,7 +108,6 @@ class WifiFileTransferPeripheral(
             }
         }
     }
-
 
     override fun makeDirectory(
         externalScope: CoroutineScope,
@@ -260,6 +260,7 @@ class WifiFileTransferPeripheral(
         return exceptionText
     }
 
+    /*
     private fun encodePath(path: String): String {
         return path.split('/').map {
             if (it != "/") {
@@ -268,6 +269,6 @@ class WifiFileTransferPeripheral(
                 it
             }
         }.joinToString("/")
-    }
+    }*/
     // endregion
 }

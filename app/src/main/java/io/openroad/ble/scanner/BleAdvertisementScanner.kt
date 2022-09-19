@@ -47,6 +47,7 @@ class BleAdvertisementScanner(
     // region Flow
     @RequiresPermission(value = "android.permission.BLUETOOTH_SCAN")
     val scanResultFlow: Flow<List<ScanResult>> = callbackFlow {
+
         if (scanner == null || !BleManager.isBleStateAndPermissionsReady(context)) {
             log.warning("scanResultFlow cannot start")
             cancel("scanResultFlow cannot start")

@@ -14,11 +14,6 @@ interface WifiPeripheralScanner {
     val wifiLastException: StateFlow<NsdException?>
     val wifiPeripherals: StateFlow<List<WifiPeripheral>>
 
-    /*
-    // Actions
-    fun start()
-    fun stop()*/
-
     // Cold flow independent from start() stop()
     val wifiPeripheralsFlow: Flow<List<WifiPeripheral>>
 }

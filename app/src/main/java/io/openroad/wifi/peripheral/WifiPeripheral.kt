@@ -9,9 +9,7 @@ import io.openroad.Peripheral
 data class WifiPeripheral(
     override val name: String?,
     override val address: String,
-    override val nameOrAddress: String = name ?: address,
     val port: Int,
-
     override val createdMillis: Long = System.currentTimeMillis(),
 ) : Peripheral {
 
@@ -24,6 +22,7 @@ data class WifiPeripheral(
         return baseUrl
     }
 
+    override val nameOrAddress: String = name ?: address
     //override val type = Peripheral.Type.Wifi
 
     override fun disconnect(cause: Throwable?) {

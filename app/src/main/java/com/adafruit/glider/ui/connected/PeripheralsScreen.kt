@@ -4,11 +4,9 @@ package com.adafruit.glider.ui.connected
  * Created by Antonio García (antonio@openroad.es)
  */
 
-import androidx.annotation.RequiresPermission
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.Arrangement.Center
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,7 +17,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Alignment.Companion.Center
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,10 +41,8 @@ import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.ble.utils.BleManager
 import io.openroad.wifi.peripheral.WifiPeripheral
 import kotlinx.coroutines.launch
-import kotlin.text.Typography
 
 @OptIn(ExperimentalPermissionsApi::class)
-@RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
 @Composable
 fun PeripheralsScreen(
     modifier: Modifier = Modifier,
@@ -129,15 +124,20 @@ fun PeripheralsScreen(
             connectionManager.setSelectedPeripheral(peripheral)
         },
         onSelectBondedPeripheral = { data ->
-            connectionManager.reconnectToBondedBlePeripherals(
-                setOf(data.address),
-                completion = { isConnected ->
-                    if (!isConnected) {
-                        coroutineScope.launch {
-                            snackBarHostState.showSnackbar(message = "Cannot connect to bonded peripheral: ${data.name ?: data.address}")
+
+            try {
+                connectionManager.reconnectToBondedBlePeripherals(
+                    setOf(data.address),
+                    completion = { isConnected ->
+                        if (!isConnected) {
+                            coroutineScope.launch {
+                                snackBarHostState.showSnackbar(message = "Cannot connect to bonded peripheral: ${data.name ?: data.address}")
+                            }
                         }
-                    }
-                })
+                    })
+            } catch (e: SecurityException) {
+                Log.e("PeripheralsScreen", "Security exception: $e")
+            }
         },
         onDeleteBondedPeripheral = { address ->
             connectionManager.disconnectFileTransferClient(address)
@@ -179,7 +179,6 @@ private fun PeripheralsScreenBody(
             .verticalScroll(scrollState)
             .padding(20.dp)
             .padding(top = 20.dp),     // Extra top padding
-        //.border(1.dp, Color.Red),
         verticalArrangement = spacedBy(24.dp),
         horizontalAlignment = CenterHorizontally,
     ) {
@@ -288,8 +287,6 @@ private fun PeripheralsListByType(
     onDeleteBondedPeripheral: ((String) -> Unit)?,
     onOpenWifiDialogSettings: ((wifiPeripheral: WifiPeripheral) -> Unit)?,
 ) {
-    val mainColor = ControlsOutline
-
     // Empty state
     if (peripherals.isEmpty() && bondedPeripherals.isEmpty()) {
         Text(
@@ -373,7 +370,7 @@ private fun PeripheralsListByType(
                 Text(
                     modifier = Modifier
                         .padding(bottom = 4.dp),
-                    text = "Bluetooth bonded".uppercase(),
+                    text = "Bluetooth Bonded".uppercase(),
                     style = MaterialTheme.typography.labelMedium
                 )
 
@@ -405,7 +402,7 @@ private fun BlePeripheralsList(
         val isOperationInProgress = peripheralAddressesBeingSetup.contains(address)
 
         val state =
-            if (isOperationInProgress) PeripheralButtonState.Wait else PeripheralButtonState.Default
+            if (isOperationInProgress) PeripheralButtonState.Wait else PeripheralButtonState.Standard
 
         PeripheralButton(
             name = name,
@@ -481,7 +478,7 @@ private fun WifiPeripheralsList(
 // region Button
 
 private sealed class PeripheralButtonState {
-    object Default : PeripheralButtonState()
+    object Standard : PeripheralButtonState()
     object Wait : PeripheralButtonState()
     object Delete : PeripheralButtonState()
     object Settings : PeripheralButtonState()
@@ -547,6 +544,7 @@ private fun PeripheralButton(
             }
         }
 
+        // State button
         if (state == PeripheralButtonState.Delete || state == PeripheralButtonState.Settings) {
             OutlinedButton(
                 onClick = { onStateAction(address) },

@@ -11,8 +11,8 @@ android {
         applicationId "com.adafruit.glider"
         minSdk 27
         targetSdk 33
-        versionCode 7
-        versionName "1.0.0"
+        versionCode 8
+        versionName "1.0.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -51,14 +51,14 @@ android {
 
 dependencies {
     // Core
-    implementation 'androidx.core:core-ktx:1.8.0'
+    implementation 'androidx.core:core-ktx:1.9.0'
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:$lifecycle_version"
-    implementation 'androidx.activity:activity-compose:1.5.1'
+    implementation 'androidx.activity:activity-compose:1.6.0'
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
 
     // Navigation
-    implementation 'androidx.navigation:navigation-compose:2.5.1'
+    implementation 'androidx.navigation:navigation-compose:2.5.2'
 
     // Lifecycle
     implementation "androidx.lifecycle:lifecycle-runtime-compose:$lifecycle_version"

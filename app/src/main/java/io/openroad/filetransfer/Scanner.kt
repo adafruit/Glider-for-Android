@@ -45,11 +45,9 @@ class Scanner(
     var isScanning = wifiPeripheralScanner.isRunning || blePeripheralScanner.isRunning
     val scanningState = _scanningState.asStateFlow()
 
-
     // region Actions
     fun startScan() {
         // Clean
-        //delayBeforeConnectingJob?.cancel()
         _scanningState.update { ScanningState.Scanning(emptyList()) }
 
         // Start Wifi Scan
@@ -103,7 +101,6 @@ class Scanner(
         }
 
 /*
-
         // Listen to scanning errors and map it to the UI state
         scanningExceptionDetectorJob = externalScope.launch {
             wifiPeripheralScanner.wifiLastException

@@ -6,11 +6,6 @@ package io.openroad.wifi.scanner
 
 import android.content.Context
 import io.openroad.wifi.peripheral.WifiPeripheral
-import com.adafruit.glider.utils.LogUtils
-import io.openroad.ble.utils.BleException
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 
@@ -21,13 +16,10 @@ import kotlinx.coroutines.flow.*
 class WifiPeripheralScannerImpl(
     context: Context,
     serviceType: String,
-    //private val externalScope: CoroutineScope,
-    //private val defaultDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : WifiPeripheralScanner {
 
     // Data - Private
     private val nsdServiceInfoScanner = NsdServiceInfoScanner(context, serviceType)
-    private val log by LogUtils()
     private var scanJob: Job? = null
 
     private val _wifiLastException = MutableStateFlow<NsdException?>(null)
@@ -39,7 +31,6 @@ class WifiPeripheralScannerImpl(
     override val isRunning: Boolean; get() = scanJob != null
     override val wifiLastException = _wifiLastException.asStateFlow()
     override val wifiPeripherals = _wifiPeripherals.asStateFlow()
-
 
     // Cold flow independent from start() stop()
     override val wifiPeripheralsFlow: Flow<List<WifiPeripheral>> =
@@ -57,51 +48,6 @@ class WifiPeripheralScannerImpl(
                 emit(knownWifiPeripherals.toList())
             }
 
-/*
-    // region Actions
-    override fun start() {
-        if (isRunning) {
-            return
-        }
-        log.info("Start WifiPeripheralScanner")
-
-        // Collect each found NsdServiceInfo and update a list of known wifiPeripheral and a wifiPeripheralsState StateFlow
-        _wifiLastException.update { null }
-        scanJob?.cancel()
-
-        scanJob = nsdServiceInfoScanner.nsdServiceInfoFlow
-            .onEach { scanResult ->
-                // Update peripherals
-                updateWifiPeripheralsWithScanResult(scanResult)
-
-                // Update state
-                _wifiPeripherals.update { knownWifiPeripherals.toList() }
-            }
-            /*.onStart{}*/
-            .onCompletion { exception ->
-                val cause = exception?.cause
-                if (cause is NsdScanException) {
-                    log.severe("wifi scanner finished: failed")
-                    _wifiLastException.update { cause }
-                } else {
-                    log.info("wifi scanner finished: done")
-                }
-            }
-            .flowOn(defaultDispatcher)
-            .launchIn(externalScope)
-    }
-
-    override fun stop() {
-        if (!isRunning) {
-            return
-        }
-        log.info("Stop WifiPeripheralScanner")
-
-        scanJob?.cancel()
-        scanJob = null
-    }
-    // endregion
-*/
     // region Utils
     @Synchronized
     private fun updateWifiPeripheralsWithScanResult(scanResult: NsdServiceInfoScanner.NsdScanResult) {

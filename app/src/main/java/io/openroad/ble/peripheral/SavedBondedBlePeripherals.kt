@@ -53,8 +53,8 @@ class SavedBondedBlePeripherals(
         val existingPeripheral = peripherals.firstOrNull { it.address == address }
         if (existingPeripheral != null) {
             peripherals.remove(existingPeripheral)
+            setBondedPeripherals(peripherals)
         }
-        setBondedPeripherals(peripherals)
     }
 
     fun clear() {

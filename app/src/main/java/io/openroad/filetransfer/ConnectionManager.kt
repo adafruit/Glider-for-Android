@@ -112,9 +112,7 @@ class ConnectionManager(
             }
         }
     }
-    // endregion
 
-    // region Actions
     @RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
     fun reconnectToBondedBlePeripherals(
         knownAddresses: Set<String>,
@@ -168,7 +166,6 @@ class ConnectionManager(
     }
 
     private fun connect(peripheral: Peripheral, completion: (FileTransferClient?) -> Unit) {
-        // Create the fileTransferClient and that's all
         var fileTransferPeripheral: FileTransferPeripheral? = null
         when (peripheral) {
             is WifiPeripheral -> fileTransferPeripheral = WifiFileTransferPeripheral(peripheral, onGetPasswordForHostName = onWifiPeripheralGetPasswordForHostName)
@@ -196,9 +193,8 @@ class ConnectionManager(
         }
         fileTransferPeripheral.connectAndSetup(
             externalScope = externalScope,
-            //onSetupDataReceived = { name, address -> onSetupDataReceived(name, address, fileTransferPeripheral.peripheral.type) },
         ) { isConnected ->
-            log.info("FileTransferClient connect result: $isConnected")
+            log.info("FileTransferClient connect success: $isConnected")
             _peripheralAddressesBeingSetup.update {
                 val newList =
                     it.toMutableList(); newList.remove(fileTransferPeripheral.peripheral.address); newList
@@ -229,7 +225,6 @@ class ConnectionManager(
         fileTransferClients[address]?.peripheral?.disconnect(null)
     }
 
-
     fun updateWifiPeripheralPassword(address: String, newPassword: String): Boolean {
         val wifiFileTransferPeripheral = fileTransferClients[address]?.fileTransferPeripheral as? WifiFileTransferPeripheral
         if (wifiFileTransferPeripheral != null) {
@@ -240,7 +235,6 @@ class ConnectionManager(
             return false        // The peripheral is not in connectionManager
         }
     }
-
     // endregion
 
     private fun updateSelectedPeripheral() {
@@ -380,7 +374,6 @@ class ConnectionManager(
 
     private fun removePeripheralFromAutomaticallyManagedConnection(bleFileTransferPeripheral: BleFileTransferPeripheral) {
         managedBlePeripherals.remove(bleFileTransferPeripheral)
-        //managedPeripheralsJobs.remove(bleFileTransferPeripheral.address)?.cancel()
     }
 
 // endregion

@@ -37,7 +37,6 @@ val initialDestination = ConnectedNavigationDestinations.Peripherals.route     /
 //val initialDestination = ConnectedNavigationDestinations.FileExplorer.route
 
 @OptIn(ExperimentalMaterial3Api::class)
-@RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
 @Composable
 fun ConnectedNavigationScreen(
     navController: NavHostController = rememberNavController(),
@@ -106,7 +105,6 @@ fun ConnectedNavigationScreen(
 }
 
 // region Body
-@RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
 @Composable
 private fun ConnectedNavGraph(
     modifier: Modifier = Modifier,
@@ -124,7 +122,7 @@ private fun ConnectedNavGraph(
         modifier = modifier
     ) {
 
-        // Info
+        // Peripherals
         composable(ConnectedNavigationDestinations.Peripherals.route) {
             val peripheralsViewModel: PeripheralsViewModel =
                 viewModel(
@@ -142,6 +140,7 @@ private fun ConnectedNavGraph(
             )
         }
 
+        // File Explorer
         composable(ConnectedNavigationDestinations.FileExplorer.route) {
             FileExplorerScreen(
                 modifier = Modifier.padding(innerPadding),
@@ -155,6 +154,7 @@ private fun ConnectedNavGraph(
                 })
         }
 
+        // Log
         composable(ConnectedNavigationDestinations.Log.route) {
             LogScreen(modifier = Modifier.padding(innerPadding))
         }

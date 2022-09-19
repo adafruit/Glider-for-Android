@@ -26,7 +26,6 @@ class PeripheralsViewModel(
     // Data - Public
     val openWifiDialogSettings = _openWifiDialogSettings.asStateFlow()
 
-
     // region Lifecycle
     fun onResume() {
         // Start scanning if we are in the scanning state

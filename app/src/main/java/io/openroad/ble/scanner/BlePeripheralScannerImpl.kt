@@ -7,7 +7,6 @@ package io.openroad.ble.scanner
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.content.Context
-import com.adafruit.glider.utils.LogUtils
 import io.openroad.ble.peripheral.BlePeripheral
 import io.openroad.ble.utils.BleException
 import kotlinx.coroutines.*
@@ -29,7 +28,7 @@ class BlePeripheralScannerImpl(
 
     // Data - Private
     private val bleAdvertisementScanner = BleAdvertisementScanner(context, scanFilters)
-    private val log by LogUtils()
+    //private val log by LogUtils()
     private var scanJob: Job? = null
     private var forgetDevicesJob: Job? = null
 

@@ -81,9 +81,7 @@ fun FileSystemScreen(
                 viewModel.listParentDirectory(fileTransferClient)?.let { newPath ->
                     onPathChange(newPath)
                 }
-            }/* else {
-                viewModel.disconnect(fileTransferClient)
-            }*/
+            }
         }
     }
 
