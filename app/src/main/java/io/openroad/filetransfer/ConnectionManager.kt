@@ -4,6 +4,9 @@ package io.openroad.filetransfer
  * Created by Antonio García (antonio@openroad.es)
  */
 
+import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.RequiresPermission
 import com.adafruit.glider.utils.LogUtils
@@ -113,7 +116,8 @@ class ConnectionManager(
         }
     }
 
-    @RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [BLUETOOTH_SCAN, BLUETOOTH_CONNECT])
     fun reconnectToBondedBlePeripherals(
         knownAddresses: Set<String>,
         completion: (isConnected: Boolean) -> Unit
@@ -142,8 +146,7 @@ class ConnectionManager(
                 }
 
                 if (readyFileTransferPeripherals.isNotEmpty()) {
-                    val firstConnectedBleFileTransferPeripheral =
-                        readyFileTransferPeripherals.first()
+                    val firstConnectedBleFileTransferPeripheral = readyFileTransferPeripherals.first()
                     log.info("Reconnected to ${firstConnectedBleFileTransferPeripheral.nameOrAddress}")
 
                     readyFileTransferPeripherals.forEach { bleFileTransferPeripheral ->
@@ -316,7 +319,6 @@ class ConnectionManager(
                                             addPeripheralToAutomaticallyManagedBleConnection(it)
                                         }
                                     }
-
                                 }
                             }
                         }

@@ -1,5 +1,8 @@
 package com.adafruit.glider.ui.connected
 
+import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
+import android.annotation.SuppressLint
 import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -221,7 +224,8 @@ private fun BottomNavigation(navController: NavController, items: List<BottomNav
 
 // region Previews
 @Preview(showSystemUi = true)
-@RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
+@SuppressLint("InlinedApi")
+@RequiresPermission(allOf = [BLUETOOTH_SCAN, BLUETOOTH_CONNECT])
 @Composable
 private fun ConnectedTabScreenPreview() {
     GliderTheme {

@@ -87,7 +87,7 @@ fun PeripheralsScreen(
     val scannedPeripherals by connectionManager.peripherals.collectAsState()
     val peripheralAddressesBeingSetup by connectionManager.peripheralAddressesBeingSetup.collectAsState()
     val bondedBlePeripheralsData by viewModel.savedBondedBlePeripherals.peripheralsData.collectAsState()
-    val openWifiDialogSettings by viewModel.openWifiDialogSettings.collectAsState()
+    val wifiDialogSettings by viewModel.wifiDialogSettings.collectAsState()
 
     val currentFileTransferClient by connectionManager.currentFileTransferClient.collectAsState()
 
@@ -143,7 +143,7 @@ fun PeripheralsScreen(
             connectionManager.disconnectFileTransferClient(address)
             viewModel.savedBondedBlePeripherals.remove(address)
         },
-        openWifiDialogSettings = openWifiDialogSettings,
+        wifiDialogSettings = wifiDialogSettings,
         onOpenWifiDialogSettings = { wifiPeripheral ->
             viewModel.openWifiDialogSettings(wifiPeripheral)
         },
@@ -166,7 +166,7 @@ private fun PeripheralsScreenBody(
     onSelectPeripheral: ((Peripheral) -> Unit)? = null,
     onSelectBondedPeripheral: ((SavedBondedBlePeripherals.Data) -> Unit)? = null,
     onDeleteBondedPeripheral: ((String) -> Unit)? = null,
-    openWifiDialogSettings: Pair<String, String>? = null,
+    wifiDialogSettings: Pair<String, String>? = null,
     onOpenWifiDialogSettings: ((wifiPeripheral: WifiPeripheral) -> Unit)? = null,
     onWifiPeripheralPasswordChanged: ((wifiPeripheral: WifiPeripheral, newPassword: String?) -> Unit)? = null,
 ) {
@@ -214,7 +214,7 @@ private fun PeripheralsScreenBody(
     }
 
     // Wifi settings dialog
-    openWifiDialogSettings?.let { settings ->
+    wifiDialogSettings?.let { settings ->
         val address = settings.first
         val currentPassword = settings.second
         val peripheralForWifiSettings = scannedPeripherals.filterIsInstance<WifiPeripheral>()

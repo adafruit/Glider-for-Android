@@ -4,6 +4,9 @@ package io.openroad.ble.peripheral
  * Created by Antonio García (antonio@openroad.es)
  */
 
+import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
+import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.le.ScanRecord
 import android.bluetooth.le.ScanResult
@@ -231,7 +234,8 @@ class BlePeripheral(
 
     // region Connection
     // TODO: convert connection and gattCallback to use Kotlin flows
-    @RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [BLUETOOTH_SCAN, BLUETOOTH_CONNECT])
     @MainThread
     fun connect(
         shouldRetryConnection: Boolean = true,
@@ -326,7 +330,8 @@ class BlePeripheral(
         if (connectionTimeout != null) {
             connectionTimeoutTimer = Timer()
             connectionTimeoutTimer?.schedule(object : TimerTask() {
-                @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+                @SuppressLint("InlinedApi")
+                @RequiresPermission(value = BLUETOOTH_CONNECT)
                 override fun run() {
                     log.info("Connection timeout fired")
                     disconnect(BleTimeoutException())
@@ -342,7 +347,8 @@ class BlePeripheral(
         connectionHandlerThread = null
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     @MainThread
     override fun disconnect(cause: Throwable?) {
         if (bluetoothGatt != null) {
@@ -357,7 +363,8 @@ class BlePeripheral(
         }
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     private fun connectionFinished(cause: Throwable? = null) {
         _connectionState.update { previousState ->
             // Set the state to disconnected, but if no cause is supplied and there was a cause when disconnecting, use that one
@@ -382,12 +389,14 @@ class BlePeripheral(
     // endregion
 
     // region Phy
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     fun setPreferredPhy(txPhy: Int, rxPhy: Int, phyOptions: Int) {
         bluetoothGatt?.setPreferredPhy(txPhy, rxPhy, phyOptions)
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     fun readPhy() {
         bluetoothGatt?.readPhy()
     }
@@ -396,7 +405,8 @@ class BlePeripheral(
     // region Discovery
     fun discoverServices(completion: CompletionHandler?) {
         val command = object : BleCommand(BLECOMMANDTYPE_DISCOVERSERVICES, null, completion) {
-            @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+            @SuppressLint("InlinedApi")
+            @RequiresPermission(value = BLUETOOTH_CONNECT)
             override fun execute() {
                 val isDiscoveryInProgress =
                     bluetoothGatt != null && bluetoothGatt!!.discoverServices()
@@ -459,7 +469,8 @@ class BlePeripheral(
             if (kDebugCommands) identifier else null,
             completionHandler
         ) {
-            @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+            @SuppressLint("InlinedApi")
+            @RequiresPermission(value = BLUETOOTH_CONNECT)
             override fun execute() {
                 val descriptor = characteristic.getDescriptor(kClientCharacteristicConfigUUID)
                 if (bluetoothGatt != null && descriptor != null && characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) {
@@ -494,7 +505,8 @@ class BlePeripheral(
             if (kDebugCommands) identifier else null,
             completionHandler
         ) {
-            @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+            @SuppressLint("InlinedApi")
+            @RequiresPermission(value = BLUETOOTH_CONNECT)
             override fun execute() {
                 val descriptor = characteristic.getDescriptor(kClientCharacteristicConfigUUID)
                 if (bluetoothGatt != null && descriptor != null && characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) {
@@ -580,7 +592,8 @@ class BlePeripheral(
 
         val command =
             object : BleCommand(BLECOMMANDTYPE_READCHARACTERISTIC, identifier, completionHandler) {
-                @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+                @SuppressLint("InlinedApi")
+                @RequiresPermission(value = BLUETOOTH_CONNECT)
                 override fun execute() {
                     if (bluetoothGatt != null) {
                         // Read Characteristic
@@ -634,7 +647,8 @@ class BlePeripheral(
 
         val command =
             object : BleCommand(BLECOMMANDTYPE_WRITECHARACTERISTIC, identifier, completionHandler) {
-                @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+                @SuppressLint("InlinedApi")
+                @RequiresPermission(value = BLUETOOTH_CONNECT)
                 override fun execute() {
                     if (bluetoothGatt != null) {
                         // Write value
@@ -727,7 +741,7 @@ class BlePeripheral(
 
         val command =
             object : BleCommand(BLECOMMANDTYPE_READDESCRIPTOR, identifier, completionHandler) {
-                @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+                @RequiresPermission(value = BLUETOOTH_CONNECT)
                 override fun execute() {
                     // Read Descriptor
                     val descriptor = characteristic.getDescriptor(descriptorUUID)
@@ -749,7 +763,7 @@ class BlePeripheral(
         val identifier: String? = null
         val command: BleCommand =
             object : BleCommand(BLECOMMANDTYPE_REQUESTMTU, identifier, completionHandler) {
-                @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+                @RequiresPermission(value = BLUETOOTH_CONNECT)
                 override fun execute() {
                     // Request mtu size change
                     log.info("Request mtu change to $mtuSize")
@@ -763,7 +777,7 @@ class BlePeripheral(
 
     // region BluetoothGattCallback
     private val gattCallback = object : BluetoothGattCallback() {
-        @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+        @RequiresPermission(value = BLUETOOTH_CONNECT)
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
 
@@ -1010,7 +1024,8 @@ class BlePeripheral(
     }
 
     // region Utils
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     @MainThread
     private fun closeBluetoothGatt() {
         bluetoothGatt?.close()

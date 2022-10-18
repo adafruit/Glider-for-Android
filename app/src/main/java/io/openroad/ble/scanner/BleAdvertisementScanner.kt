@@ -4,6 +4,7 @@ package io.openroad.ble.scanner
  * Created by Antonio García (antonio@openroad.es)
  */
 
+import android.Manifest.permission.BLUETOOTH_SCAN
 import android.annotation.SuppressLint
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
@@ -45,7 +46,8 @@ class BleAdvertisementScanner(
     var isScanning = false; private set
 
     // region Flow
-    @RequiresPermission(value = "android.permission.BLUETOOTH_SCAN")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_SCAN)
     val scanResultFlow: Flow<List<ScanResult>> = callbackFlow {
 
         if (scanner == null || !BleManager.isBleStateAndPermissionsReady(context)) {

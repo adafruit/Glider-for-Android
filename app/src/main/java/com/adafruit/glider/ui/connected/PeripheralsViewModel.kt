@@ -21,10 +21,10 @@ class PeripheralsViewModel(
 
     // Data - Private
     private val log by LogUtils()
-    private val _openWifiDialogSettings = MutableStateFlow<Pair<String, String>?>(null)       // address, currentPassword
+    private val _wifiDialogSettings = MutableStateFlow<Pair<String, String>?>(null)       // address, currentPassword
 
     // Data - Public
-    val openWifiDialogSettings = _openWifiDialogSettings.asStateFlow()
+    val wifiDialogSettings = _wifiDialogSettings.asStateFlow()
 
     // region Lifecycle
     fun onResume() {
@@ -50,13 +50,13 @@ class PeripheralsViewModel(
     fun openWifiDialogSettings(wifiPeripheral: WifiPeripheral) {
         getWifiPeripheralCurrentPassword(wifiPeripheral) {password ->
             if (password != null) {
-                _openWifiDialogSettings.update { Pair(wifiPeripheral.address, password) }
+                _wifiDialogSettings.update { Pair(wifiPeripheral.address, password) }
             }
         }
     }
 
     fun closeWifiDialogSettings() {
-        _openWifiDialogSettings.update { null }
+        _wifiDialogSettings.update { null }
     }
 
     private fun getWifiPeripheralCurrentPassword(wifiPeripheral: WifiPeripheral, completion: (String?)->Unit) {

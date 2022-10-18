@@ -1,5 +1,8 @@
 package io.openroad.filetransfer
 
+import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
@@ -157,7 +160,8 @@ class BleFileTransferPeripheral(
 
     // region Actions
 
-    @RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [BLUETOOTH_SCAN, BLUETOOTH_CONNECT])
     @MainThread
     override fun connectAndSetup(
         externalScope: CoroutineScope,
@@ -166,7 +170,6 @@ class BleFileTransferPeripheral(
     ) {
         disable()
 
-        setupCompletionHandler = null
         _fileTransferState.update { FileTransferState.Start }
         // Connects using the standard connect function but the state changes will be collected to trigger the next steps in the FileTransfer setup
         peripheral.connect(
@@ -182,7 +185,8 @@ class BleFileTransferPeripheral(
         }
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     fun disconnect(cause: Throwable? = null) = peripheral.disconnect(cause)
 
     private fun disable() {
@@ -244,7 +248,8 @@ class BleFileTransferPeripheral(
         moveStatus = null
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     private fun discoverServicesAndEnableFileTransfer() {
         log.info("Discovering services...")
         peripheral.discoverServices { discoverStatus ->
@@ -260,7 +265,9 @@ class BleFileTransferPeripheral(
                         else FileTransferState.Enabled
                     }
 
-                    setupCompletionHandler?.let { it(true) }
+                    val completionHandler = setupCompletionHandler
+                    this.setupCompletionHandler = null
+                    completionHandler?.let { it(true) }
                 }
             } else {
                 peripheral.disconnect(BleDiscoveryException())

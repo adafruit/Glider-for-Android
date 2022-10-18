@@ -5,6 +5,9 @@ package io.openroad.ble.utils
  */
 
 import android.Manifest
+import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
+import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.content.Context
 import android.content.pm.PackageManager
@@ -39,7 +42,7 @@ object BleManager {
         val isBluetoothScanGranted =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || ContextCompat.checkSelfPermission(
                 context,
-                Manifest.permission.BLUETOOTH_SCAN
+                BLUETOOTH_SCAN
             ) == PackageManager.PERMISSION_GRANTED
         val isLocationGranted =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.S || ContextCompat.checkSelfPermission(
@@ -61,8 +64,8 @@ object BleManager {
     fun getNeededPermissions(): List<String> {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             listOf(
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT
+                BLUETOOTH_SCAN,
+                BLUETOOTH_CONNECT
             )
         } else {
             listOf(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -105,17 +108,20 @@ object BleManager {
         return getBluetoothManager(context)?.adapter
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     fun getConnectedPeripherals(context: Context): List<BluetoothDevice>? {
         return getBluetoothManager(context)?.getConnectedDevices(BluetoothProfile.GATT)
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_CONNECT")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     fun getPairedPeripherals(context: Context): Set<BluetoothDevice>? {
         return getBluetoothAdapter(context)?.bondedDevices
     }
 
-    @RequiresPermission(value = "android.permission.BLUETOOTH_SCAN")
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_SCAN)
     fun cancelDiscovery(context: Context) {
         getBluetoothAdapter(context)?.cancelDiscovery()
     }
@@ -137,7 +143,8 @@ object BleManager {
 
     // region Reconnect
 
-    @RequiresPermission(allOf = ["android.permission.BLUETOOTH_SCAN", "android.permission.BLUETOOTH_CONNECT"])
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [BLUETOOTH_SCAN, BLUETOOTH_CONNECT])
     fun reconnectToPeripherals(
         context: Context,
         externalScope: CoroutineScope,
@@ -166,7 +173,6 @@ object BleManager {
                 bleFileTransferPeripheral.connectAndSetup(
                     externalScope = externalScope,
                     connectionTimeout = connectionTimeout,
-                    //onSetupDataReceived = onBonded,
                 ) { isConnected ->
                     // Return with the fist connected peripheral or with null if all peripherals fail
                     if (isConnected) {
