@@ -75,7 +75,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
 
     // Material design
-    implementation 'androidx.compose.material3:material3:1.0.0-alpha16'
+    implementation 'androidx.compose.material3:material3:1.0.0-rc01'
     implementation "androidx.compose.material:material-icons-extended:$compose_version"
 
     //      For legacy controls (i.e: SwipeToDismiss)
@@ -88,7 +88,7 @@ dependencies {
     implementation "com.google.accompanist:accompanist-permissions:$accompanist_version"
 
     // Reflection (Used by log)
-    implementation "org.jetbrains.kotlin:kotlin-reflect:1.7.10"
+    implementation "org.jetbrains.kotlin:kotlin-reflect:1.7.20"
 
     // Gson (used to store objects to SharedPreferences)
     implementation 'com.google.code.gson:gson:2.8.9'

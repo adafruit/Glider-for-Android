@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.adafruit.glider.ui.theme.GliderTheme
-import com.adafruit.glider.utils.TextFieldNoPadding
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,7 +24,7 @@ fun InputTextActionDialog(
     actionText: String,
     onAction: (String?) -> Unit,            // returns the text or null if cancel was pressed
 ) {
-    var inputText by remember { mutableStateOf(TextFieldValue(currentText)) }
+    var inputText by remember { mutableStateOf(currentText) }
 
     AlertDialog(
         onDismissRequest = { onAction(null) },
@@ -37,7 +35,7 @@ fun InputTextActionDialog(
         text = {
             Column(verticalArrangement = Arrangement.Absolute.spacedBy(16.dp)) {
                 Text(alertMessage)
-                TextFieldNoPadding(
+                TextField(
                     colors = TextFieldDefaults.textFieldColors(
                         textColor = Color.Black,
                         placeholderColor = Color.Gray,
@@ -53,14 +51,14 @@ fun InputTextActionDialog(
             }
         },
         confirmButton = {
-            OutlinedButton(enabled = inputText.text.isNotBlank(),
+            OutlinedButton(enabled = inputText.isNotBlank(),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = Color.Black,
                     disabledContentColor = Color.Gray,
                 ),
                 border = BorderStroke(1.dp, Color.Black),
                 onClick = {
-                    onAction(inputText.text)
+                    onAction(inputText)
                 }) {
                 Text(actionText)
             }
