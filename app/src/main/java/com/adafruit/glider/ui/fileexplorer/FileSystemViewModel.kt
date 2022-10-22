@@ -4,9 +4,9 @@ package com.adafruit.glider.ui.fileexplorer
  * Created by Antonio García (antonio@openroad.es)
  */
 
-import io.openroad.filetransfer.FileTransferClient
-import io.openroad.utils.pathRemovingFilename
-import io.openroad.utils.upPath
+import io.openroad.filetransfer.filetransfer.FileTransferClient
+import io.openroad.filetransfer.utils.pathRemovingFilename
+import io.openroad.filetransfer.utils.upPath
 import kotlinx.coroutines.flow.update
 
 class FileSystemViewModel :

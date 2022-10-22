@@ -27,9 +27,9 @@ import androidx.navigation.compose.rememberNavController
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
-import io.openroad.ble.scanner.BlePeripheralScannerFake
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.wifi.scanner.WifiPeripheralScannerFake
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

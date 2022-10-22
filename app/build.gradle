@@ -11,8 +11,8 @@ android {
         applicationId "com.adafruit.glider"
         minSdk 27
         targetSdk 33
-        versionCode 8
-        versionName "1.0.1"
+        versionCode 9
+        versionName "1.0.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -57,41 +57,26 @@ dependencies {
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
 
-    // Navigation
-    implementation 'androidx.navigation:navigation-compose:2.5.2'
-
-    // Lifecycle
-    implementation "androidx.lifecycle:lifecycle-runtime-compose:$lifecycle_version"
-    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycle_version"
-
-    // Retrofit
-    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.10.0'
-    implementation 'com.squareup.retrofit2:converter-scalars:2.9.0'
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
-
     // Material design
     implementation 'androidx.compose.material3:material3:1.0.0-rc01'
+
+    // Material icons
     implementation "androidx.compose.material:material-icons-extended:$compose_version"
 
     //      For legacy controls (i.e: SwipeToDismiss)
     implementation "androidx.compose.material:material:$compose_version"
 
-    // Startup initializer
-    implementation "androidx.startup:startup-runtime:1.1.1"
+    // Navigation
+    implementation 'androidx.navigation:navigation-compose:2.5.2'
 
     // Permissions
     implementation "com.google.accompanist:accompanist-permissions:$accompanist_version"
 
-    // Reflection (Used by log)
-    implementation "org.jetbrains.kotlin:kotlin-reflect:1.7.20"
+    // Startup initializer
+    implementation "androidx.startup:startup-runtime:1.1.1"
 
-    // Gson (used to store objects to SharedPreferences)
-    implementation 'com.google.code.gson:gson:2.8.9'
+    // FileTransfer lib
+    implementation project(path: ':libraries:filetransfer')
 
     // Test
     testImplementation 'junit:junit:4.13.2'

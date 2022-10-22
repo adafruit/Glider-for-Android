@@ -5,13 +5,14 @@ package com.adafruit.glider
  */
 
 import android.content.Context
-import io.openroad.Peripheral
-import io.openroad.ble.peripheral.SavedBondedBlePeripherals
-import io.openroad.ble.scanner.BlePeripheralScanner
-import io.openroad.ble.scanner.BlePeripheralScannerImpl
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.wifi.peripheral.SavedSettingsWifiPeripherals
-import io.openroad.wifi.scanner.WifiPeripheralScanner
+import io.openroad.filetransfer.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScanner
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerImpl
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.wifi.peripheral.SavedSettingsWifiPeripherals
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScanner
+
+
 import io.openroad.wifi.scanner.WifiPeripheralScannerImpl
 import kotlinx.coroutines.MainScope
 

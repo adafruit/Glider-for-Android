@@ -25,13 +25,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.adafruit.glider.ui.components.InputTextActionDialog
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
+import com.adafruit.glider.ui.components.InputTextActionDialog
 import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
-import io.openroad.ble.scanner.BlePeripheralScannerFake
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.wifi.scanner.WifiPeripheralScannerFake
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
 @Composable
 fun FileExplorerScreen(

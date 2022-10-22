@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -35,11 +36,11 @@ import com.adafruit.glider.ui.theme.WarningBackground
 import com.adafruit.glider.utils.observeAsState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import io.openroad.Peripheral
-import io.openroad.ble.peripheral.SavedBondedBlePeripherals
-import io.openroad.ble.peripheral.BlePeripheral
-import io.openroad.ble.utils.BleManager
-import io.openroad.wifi.peripheral.WifiPeripheral
+import io.openroad.filetransfer.Config
+import io.openroad.filetransfer.Peripheral
+import io.openroad.filetransfer.ble.peripheral.BlePeripheral
+import io.openroad.filetransfer.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalPermissionsApi::class)
@@ -49,6 +50,8 @@ fun PeripheralsScreen(
     viewModel: PeripheralsViewModel,
     snackBarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    val logTag = "PeripheralsScreen"
+
     // Permissions
     val isInitialPermissionsCheckInProgress: Boolean
     if (LocalInspectionMode.current) {
@@ -57,7 +60,7 @@ fun PeripheralsScreen(
     } else {
         // Check Bluetooth-related permissions state
         val bluetoothPermissionState =
-            rememberMultiplePermissionsState(BleManager.getNeededPermissions())
+            rememberMultiplePermissionsState(Config.getNeededPermissions())
 
         isInitialPermissionsCheckInProgress =
             !bluetoothPermissionState.allPermissionsGranted && !bluetoothPermissionState.shouldShowRationale
@@ -114,6 +117,8 @@ fun PeripheralsScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     PeripheralsScreenBody(
         modifier = modifier,
         scannedPeripherals = scannedPeripherals,
@@ -121,7 +126,15 @@ fun PeripheralsScreen(
         peripheralAddressesBeingSetup = peripheralAddressesBeingSetup,
         selectedPeripheral = currentFileTransferClient?.peripheral,
         onSelectPeripheral = { peripheral ->
-            connectionManager.setSelectedPeripheral(peripheral)
+            if (Config.areNeededPermissionsGranted(context)) {
+                try {
+                    connectionManager.setSelectedPeripheral(peripheral)
+                } catch (e: SecurityException) {
+                    Log.e(logTag, "Security exception: $e")
+                }
+            } else {
+                Log.d(logTag, "TODO: show permissions needed")
+            }
         },
         onSelectBondedPeripheral = { data ->
 
@@ -136,7 +149,7 @@ fun PeripheralsScreen(
                         }
                     })
             } catch (e: SecurityException) {
-                Log.e("PeripheralsScreen", "Security exception: $e")
+                Log.e(logTag, "Security exception: $e")
             }
         },
         onDeleteBondedPeripheral = { address ->
@@ -182,22 +195,10 @@ private fun PeripheralsScreenBody(
         verticalArrangement = spacedBy(24.dp),
         horizontalAlignment = CenterHorizontally,
     ) {
-        Row(
-            horizontalArrangement = Arrangement.Absolute.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            /*CircularProgressIndicator(
-                color = Color.White,
-                strokeWidth = 2.dp,
-                modifier = Modifier.size(14.dp)
-            )*/
-
-            Text(
-                //text = "Scanning Peripherals...".uppercase(),
-                text = "Select Peripheral".uppercase(),
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
+        Text(
+            text = "Select Peripheral".uppercase(),
+            style = MaterialTheme.typography.bodyLarge
+        )
 
         PeripheralsListByType(
             peripherals = scannedPeripherals,
@@ -273,7 +274,6 @@ private fun PeripheralsScreenBody(
             }
         )
     }
-
 }
 
 @Composable

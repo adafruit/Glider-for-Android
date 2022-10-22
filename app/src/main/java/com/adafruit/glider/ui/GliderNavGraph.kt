@@ -4,7 +4,6 @@ package com.adafruit.glider.ui
  * Created by Antonio García (antonio@openroad.es)
  */
 
-import androidx.annotation.RequiresPermission
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -15,7 +14,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.adafruit.glider.AppContainer
 import com.adafruit.glider.ui.connected.ConnectedNavigationScreen
-import com.adafruit.glider.ui.fileexplorer.FileCommandsViewModel
 import com.adafruit.glider.ui.fileexplorer.FileEditScaffoldingScreen
 import com.adafruit.glider.ui.fileexplorer.FileSystemViewModel
 import com.adafruit.glider.ui.fileexplorer.SelectDirectoryScreen

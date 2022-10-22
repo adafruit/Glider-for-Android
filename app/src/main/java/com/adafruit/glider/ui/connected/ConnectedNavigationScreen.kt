@@ -7,11 +7,13 @@ import androidx.annotation.RequiresPermission
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -29,12 +31,13 @@ import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.components.GliderSnackbarHost
 import com.adafruit.glider.ui.fileexplorer.FileExplorerScreen
 import com.adafruit.glider.ui.theme.GliderTheme
-import com.adafruit.glider.utils.LogManager
-import io.openroad.ble.peripheral.SavedBondedBlePeripherals
-import io.openroad.ble.scanner.BlePeripheralScannerFake
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.wifi.peripheral.SavedSettingsWifiPeripherals
-import io.openroad.wifi.scanner.WifiPeripheralScannerFake
+import io.openroad.filetransfer.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
+import io.openroad.filetransfer.ble.utils.LogManager
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.wifi.peripheral.SavedSettingsWifiPeripherals
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
+
 
 val initialDestination = ConnectedNavigationDestinations.Peripherals.route     // Debug
 //val initialDestination = ConnectedNavigationDestinations.FileExplorer.route

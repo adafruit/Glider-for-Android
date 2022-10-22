@@ -7,11 +7,11 @@ package com.adafruit.glider.ui.fileexplorer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adafruit.glider.utils.LogUtils
-import io.openroad.filetransfer.DirectoryEntry
-import io.openroad.filetransfer.FileTransferClient
-import io.openroad.filetransfer.TransmissionLog
-import io.openroad.filetransfer.TransmissionProgress
-import io.openroad.utils.isRootDirectory
+import io.openroad.filetransfer.filetransfer.DirectoryEntry
+import io.openroad.filetransfer.filetransfer.FileTransferClient
+import io.openroad.filetransfer.filetransfer.TransmissionLog
+import io.openroad.filetransfer.filetransfer.TransmissionProgress
+import io.openroad.filetransfer.utils.isRootDirectory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update

@@ -8,11 +8,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.adafruit.glider.utils.LogUtils
-import io.openroad.Peripheral
-import io.openroad.ble.peripheral.BlePeripheral
-import io.openroad.ble.utils.BleConnectionException
 import io.openroad.filetransfer.*
-import io.openroad.wifi.peripheral.WifiPeripheral
+import io.openroad.filetransfer.ble.peripheral.BlePeripheral
+import io.openroad.filetransfer.ble.utils.BleConnectionException
+import io.openroad.filetransfer.filetransfer.*
+import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
@@ -82,8 +82,10 @@ class ScanViewModel(
                         result = UiState.Error(
                             fileTransferState.cause ?: Exception("Error")
                         )
+                    else -> {
+                        result = UiState.Startup
+                    }
                 }
-
             } else if (fileTransferClient != null) {
                 result = UiState.Connected(fileTransferClient)
             } else if (selectedPeripheral != null) {

@@ -4,11 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.adafruit.glider.utils.LogUtils
-import io.openroad.ble.peripheral.SavedBondedBlePeripherals
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.filetransfer.WifiFileTransferPeripheral
-import io.openroad.wifi.peripheral.SavedSettingsWifiPeripherals
-import io.openroad.wifi.peripheral.WifiPeripheral
+import io.openroad.filetransfer.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.filetransfer.WifiFileTransferPeripheral
+import io.openroad.filetransfer.wifi.peripheral.SavedSettingsWifiPeripherals
+import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update

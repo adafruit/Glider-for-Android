@@ -43,9 +43,9 @@ import com.adafruit.glider.ui.theme.BackgroundDefault
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.WarningBackground
 import com.adafruit.glider.ui.components.gesturesDisabled
-import io.openroad.ble.peripheral.BlePeripheral
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.filetransfer.DirectoryEntry
+import io.openroad.filetransfer.ble.peripheral.BlePeripheral
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.filetransfer.DirectoryEntry
 
 @Composable
 fun FileSystemScreen(
@@ -338,13 +338,13 @@ private fun FileSystemEntry(
     entry: DirectoryEntry,
     onEntrySelected: (DirectoryEntry) -> Unit,
 ) {
-    when (entry.type) {
+    when (val type = entry.type) {
         is DirectoryEntry.EntryType.File -> {
 
             FileRow(
                 //modifier = Modifier.border(1.dp, Color.Green),
                 name = entry.name,
-                size = entry.type.size,
+                size = type.size,
                 isHidden = entry.isHidden,
                 onClick = {
                     onEntrySelected(entry)
@@ -370,6 +370,9 @@ private fun FileSystemEntry(
                     size = null
                 )
             }
+        }
+        else -> {
+            // No more types are defined
         }
     }
 }

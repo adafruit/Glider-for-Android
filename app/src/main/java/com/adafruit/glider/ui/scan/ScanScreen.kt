@@ -36,15 +36,17 @@ import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.utils.observeAsState
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import io.openroad.Peripheral
-import io.openroad.ble.peripheral.BlePeripheral
-import io.openroad.ble.scanner.BlePeripheralScannerFake
-import io.openroad.ble.utils.BleManager
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.filetransfer.FileTransferClient
-import io.openroad.wifi.peripheral.WifiPeripheral
-import io.openroad.wifi.scanner.NsdScanException
-import io.openroad.wifi.scanner.WifiPeripheralScannerFake
+import io.openroad.filetransfer.Config
+import io.openroad.filetransfer.Peripheral
+import io.openroad.filetransfer.ble.peripheral.BlePeripheral
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
+import io.openroad.filetransfer.ble.utils.BleManager
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.filetransfer.FileTransferClient
+import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
+import io.openroad.filetransfer.wifi.scanner.NsdScanException
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
+
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -60,7 +62,7 @@ fun ScanScreen(
     } else {
         // Check Bluetooth-related permissions state
         val bluetoothPermissionState =
-            rememberMultiplePermissionsState(BleManager.getNeededPermissions())
+            rememberMultiplePermissionsState(Config.getNeededPermissions())
 
         isInitialPermissionsCheckInProgress =
             !bluetoothPermissionState.allPermissionsGranted && !bluetoothPermissionState.shouldShowRationale
@@ -401,7 +403,11 @@ private fun Wave(color: Color = Color.Black, scale: Float = 1f, lineWidth: Float
 fun ScanSmartphonePreview() {
     GliderTheme {
         val connectionManager =
-            ConnectionManager(LocalContext.current, BlePeripheralScannerFake(), WifiPeripheralScannerFake())
+            ConnectionManager(
+                LocalContext.current,
+                BlePeripheralScannerFake(),
+                WifiPeripheralScannerFake()
+            )
 
         val scanViewModel: ScanViewModel = viewModel(
             factory = ScanViewModel.provideFactory(connectionManager, true)
