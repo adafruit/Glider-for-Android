@@ -13,6 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Glider"
         android:usesCleartextTraffic="true"
+        android:windowSoftInputMode="adjustResize"
         tools:targetApi="32">
         <activity
             android:name=".MainActivity"

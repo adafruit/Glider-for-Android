@@ -31,7 +31,7 @@ import io.openroad.filetransfer.filetransfer.ConnectionManager
 import io.openroad.filetransfer.utils.filenameFromPath
 import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FileEditScaffoldingScreen(
     connectionManager: ConnectionManager,
@@ -41,6 +41,7 @@ fun FileEditScaffoldingScreen(
     val title = filenameFromPath(path)
 
     Scaffold(
+        contentWindowInsets = if (WindowInsets.isImeVisible) WindowInsets.ime else  WindowInsets.navigationBars,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(title) },
@@ -68,7 +69,7 @@ fun FileEditScaffoldingScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FileEditScreen(
     modifier: Modifier = Modifier,
@@ -113,12 +114,14 @@ fun FileEditScreen(
                 .weight(1.0f)
                 .clip(RoundedCornerShape(4.dp))
         ) {
+
             TextField(
                 value = editedText,
                 onValueChange = {
                     editedText = it
                 },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize(),
                 label = null,
                 shape = RoundedCornerShape(8.dp),
                 colors = TextFieldDefaults.textFieldColors(
@@ -212,7 +215,11 @@ fun FileEditScreen(
 @Preview(showSystemUi = true)
 @Composable
 private fun FileEditScreenPreview() {
-    val connectionManager = ConnectionManager(LocalContext.current, BlePeripheralScannerFake(), WifiPeripheralScannerFake())
+    val connectionManager = ConnectionManager(
+        LocalContext.current,
+        BlePeripheralScannerFake(),
+        WifiPeripheralScannerFake()
+    )
 
     GliderTheme {
         FileEditScaffoldingScreen(connectionManager = connectionManager, path = "file.txt")
