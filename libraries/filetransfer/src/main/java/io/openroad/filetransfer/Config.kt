@@ -1,7 +1,6 @@
 package io.openroad.filetransfer
 
 import android.Manifest
-import android.Manifest.permission
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
