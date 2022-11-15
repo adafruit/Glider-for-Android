@@ -1,5 +1,6 @@
 package io.openroad.wifi.network
 
+import android.util.Log
 import com.adafruit.glider.utils.LogUtils
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray

@@ -35,6 +35,8 @@ class BlePeripheralScannerFake(
     override val blePeripheralsFlow: Flow<List<BlePeripheral>> =
         emptyFlow()
 
+    override fun clearBleLastException() {
+    }
     /*
     override fun start() {}
 

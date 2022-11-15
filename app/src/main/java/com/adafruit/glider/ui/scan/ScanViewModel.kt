@@ -4,6 +4,9 @@ package com.adafruit.glider.ui.scan
  * Created by Antonio García (antonio@openroad.es)
  */
 
+import android.Manifest
+import android.annotation.SuppressLint
+import androidx.annotation.RequiresPermission
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -31,6 +34,7 @@ class ScanViewModel(
         data class Scanning(val peripherals: List<Peripheral>) : UiState()
         data class Connecting(val peripheral: Peripheral, val description: String? = null) :
             UiState()
+
         data class Connected(val client: FileTransferClient) : UiState()
         data class FileTransferEnabled(val client: FileTransferClient) : UiState()
         data class Error(val cause: Throwable) : UiState()
@@ -163,7 +167,12 @@ class ScanViewModel(
                             }
 
                         if (selectedPeripheral != null) {
-                            stopScanningAndConnect(selectedPeripheral)
+                            try {
+                                stopScanningAndConnect(selectedPeripheral)
+                            }
+                            catch (e: SecurityException) {
+                                log.severe("Invalid permissions")
+                            }
                         }
                     }
 
@@ -214,6 +223,8 @@ class ScanViewModel(
     // endregion
 
     // region Utils
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private fun stopScanningAndConnect(peripheral: Peripheral) {
         log.info("Connect to ${peripheral.nameOrAddress}")
 
@@ -234,14 +245,18 @@ class ScanViewModel(
         }
     }
 
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private fun connect(
         peripheral: Peripheral,
     ) {
         var fileTransferPeripheral: FileTransferPeripheral? = null
         when (peripheral) {
-            is WifiPeripheral -> fileTransferPeripheral = WifiFileTransferPeripheral(peripheral, onWifiPeripheralGetPasswordForHostName)
+            is WifiPeripheral -> fileTransferPeripheral =
+                WifiFileTransferPeripheral(peripheral, onWifiPeripheralGetPasswordForHostName)
             is BlePeripheral -> {
-                fileTransferPeripheral = BleFileTransferPeripheral(peripheral, onBlePeripheralBonded)
+                fileTransferPeripheral =
+                    BleFileTransferPeripheral(peripheral, onBlePeripheralBonded)
 
                 // Link state changes during connection to UI. This is different for wifi or bluetooth peripherals (because bluetooth could potentially need a lot of steps to connect)
                 linkBleFileTransferState(fileTransferPeripheral)
@@ -260,16 +275,20 @@ class ScanViewModel(
         }
 
         // Connect
-        connectionManager.connect(fileTransferPeripheral) { fileTransferClient ->
-            viewModelState.update {
-                if (fileTransferClient != null) {
-                    it.copy(fileTransferClient = fileTransferClient)
-                } else {
-                    it.copy(
-                        fileTransferClient = null,
-                        error = Exception("Error connecting to: ${peripheral.nameOrAddress}")
-                    )
-                }
+        connectionManager.connect(fileTransferPeripheral) { result ->
+            viewModelState.update { viewModelState ->
+
+                result.fold(
+                    onSuccess = {
+                        viewModelState.copy(fileTransferClient = it)
+                    },
+                    onFailure = {
+                        viewModelState.copy(
+                            fileTransferClient = null,
+                            error = Exception("Error connecting to: ${peripheral.nameOrAddress}")
+                        )
+                    }
+                )
             }
         }
     }

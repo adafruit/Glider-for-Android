@@ -44,6 +44,7 @@ typealias FileTransferDataHandler = (data: ByteArray) -> Unit
 const val kPreferredMtuSize = 512
 
 const val kReadFileResponseHeaderSize = 16              // (1+1+2+4+4+4+variable)
+const val kWriteChunkHeaderSize = 12                     // 4 + 4 + 4
 const val kWriteFileResponseHeaderSize = 20             // (1+1+2+4+8+4)
 const val kListDirectoryResponseHeaderSize = 28         // (1+1+2+4+4+4+8+4+variable)
 const val kMakeDirectoryResponseHeaderSize = 16         // (1+1+6+8)
@@ -137,7 +138,14 @@ class BleFileTransferPeripheral(
                             FileTransferState.Disconnecting(connectionState.cause)
                         }
                         is BlePeripheral.ConnectionState.Disconnected -> _fileTransferState.update {
-                            setupCompletionHandler?.let { it(false) }
+                            setupCompletionHandler?.let {
+                                it(
+                                    Result.failure(
+                                        connectionState.cause
+                                            ?: BleConnectionInvalidStateException()
+                                    )
+                                )
+                            }
                             disable()
                             FileTransferState.Disconnected(connectionState.cause)
                         }
@@ -171,13 +179,12 @@ class BleFileTransferPeripheral(
         peripheral.connect(
             connectionTimeout = connectionTimeout,
             onBonded = onBonded
-        ) { isConnected ->
+        ) { result ->
             // if connected, wait to call completion until setup has finished
-            if (isConnected) {
-                setupCompletionHandler = completion
-            } else {
-                completion(false)
-            }
+            result.fold(
+                onSuccess = { setupCompletionHandler = completion },
+                onFailure = { completion(Result.failure(it)) }
+            )
         }
     }
 
@@ -263,7 +270,7 @@ class BleFileTransferPeripheral(
 
                     val completionHandler = setupCompletionHandler
                     this.setupCompletionHandler = null
-                    completionHandler?.let { it(true) }
+                    completionHandler?.let { it(Result.success(Unit)) }
                 }
             } else {
                 peripheral.disconnect(BleDiscoveryException())
@@ -271,6 +278,8 @@ class BleFileTransferPeripheral(
         }
     }
 
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     private fun fileTransferEnable(
         completion: CompletionHandler
     ) {
@@ -693,7 +702,9 @@ class BleFileTransferPeripheral(
                 completion?.let { it(Result.success(writeDate)) }
 
             } else {
-                writeFileChunk(offset = offset, chunkSize = freeSpace) { result ->
+                val chunkSize = freeSpace.coerceIn(0, 25)
+                //val chunkSize = freeSpace.coerceIn(0, peripheral.mtuSize - kWriteChunkHeaderSize)
+                writeFileChunk(offset = offset, chunkSize = chunkSize) { result ->
                     val exception = result.exceptionOrNull()
                     if (exception != null) {
                         this.writeStatus = null
@@ -920,13 +931,15 @@ class BleFileTransferPeripheral(
         }
     }
 
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(value = BLUETOOTH_CONNECT)
     private fun setNotifyResponse(
         characteristic: BluetoothGattCharacteristic,
         updateHandler: FileTransferDataHandler,
         completion: CompletionHandler
     ) {
         // Prepare notification handler
-        /* TODO: check if weak referece causes problems
+        /* TODO: check if weak reference causes problems
         val weakUpdateHandler = WeakReference(updateHandler)
         val notifyHandler: NotifyHandler = {
             val handler = weakUpdateHandler.get()

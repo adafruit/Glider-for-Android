@@ -149,6 +149,16 @@ object BleManager {
 
         // Reconnect to a known identifier
         val awaitingConnection: MutableSet<String> = addresses.toMutableSet()
+
+        fun connectionSetupFinishedHandler(address: String) {
+            awaitingConnection.remove(address)
+
+            // Call completion when all awaiting peripherals have finished reconnection
+            if (awaitingConnection.isEmpty()) {
+                completion(connectedAndSetupPeripherals)
+            }
+        }
+
         for (address in addresses) {
             try {
                 val device = adapter.getRemoteDevice(address)
@@ -158,21 +168,24 @@ object BleManager {
                 bleFileTransferPeripheral.connectAndSetup(
                     externalScope = externalScope,
                     connectionTimeout = connectionTimeout,
-                ) { isConnected ->
+                ) { result ->
                     // Return with the fist connected peripheral or with null if all peripherals fail
-                    if (isConnected) {
+                    if (result.isSuccess) {
                         connectedAndSetupPeripherals.add(bleFileTransferPeripheral)
                     }
+                    /*
                     awaitingConnection.remove(address)
 
                     // Call completion when all awaiting peripherals have finished reconnection
                     if (awaitingConnection.isEmpty()) {
                         completion(connectedAndSetupPeripherals)
-                    }
+                    }*/
+                    connectionSetupFinishedHandler(address)
                 }
 
             } catch (e: IllegalArgumentException) {
                 log.warning("Invalid address: $address")
+                connectionSetupFinishedHandler(address)
             }
         }
 

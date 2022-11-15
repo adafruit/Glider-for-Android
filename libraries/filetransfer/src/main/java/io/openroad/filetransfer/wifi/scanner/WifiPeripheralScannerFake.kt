@@ -35,4 +35,7 @@ class WifiPeripheralScannerFake(
 
     override val wifiPeripheralsFlow: Flow<List<WifiPeripheral>> =
         emptyFlow()
+
+    override fun clearWifiLastException() {
+    }
 }

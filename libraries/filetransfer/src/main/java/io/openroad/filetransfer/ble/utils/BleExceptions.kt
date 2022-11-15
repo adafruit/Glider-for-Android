@@ -20,6 +20,10 @@ class BleInvalidStateException internal constructor(
     cause: Throwable? = null,
 ) : BleException(message, cause)
 
+class BleOperationInProgressException internal constructor(
+    message: String? = null,
+) : BleException(message)
+
 
 class BleConnectionInvalidStateException internal constructor(
     message: String? = null,

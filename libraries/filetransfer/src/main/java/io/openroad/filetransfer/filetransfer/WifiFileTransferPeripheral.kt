@@ -7,6 +7,7 @@ package io.openroad.filetransfer.filetransfer
 import android.util.Base64
 import com.adafruit.glider.utils.LogUtils
 import io.openroad.filetransfer.PeripheralConnectCompletionHandler
+import io.openroad.filetransfer.ble.utils.BleException
 import io.openroad.filetransfer.ble.utils.LogHandler
 import io.openroad.filetransfer.wifi.model.FileTransferWebApiVersion
 import io.openroad.wifi.network.FileTransferNetworkServiceInterface
@@ -60,10 +61,10 @@ class WifiFileTransferPeripheral(
                 } else {
                     log.info("hostName: ${version.hostName} using default password: '$password'")
                 }
-                completion(true)
+                completion(Result.success(Unit))
             } else {
-                log.warning("Error retrieving /version.json")
-                completion(false)
+                log.warning("connectAndSetup: Error retrieving /version.json")
+                completion(Result.failure(BleException("Error retrieving /version.json")))
             }
         }
     }
@@ -79,7 +80,7 @@ class WifiFileTransferPeripheral(
             }.onSuccess { version ->
                 completion(version)
             }.onFailure {
-                log.warning("Error retrieving /version.json")
+                log.warning("getVersion: Error retrieving /version.json")
                 completion(null)
             }
         }

@@ -46,18 +46,21 @@ class Scanner(
     //var isScanning = wifiPeripheralScanner.isRunning || blePeripheralScanner.isRunning
     val scanningState = _scanningState.asStateFlow()
     val isScanning = _scanningState.map { it is ScanningState.Scanning }.stateIn(
-            externalScope, SharingStarted.Lazily, scanningState.value is ScanningState.Scanning
-        )
+        externalScope, SharingStarted.Lazily, scanningState.value is ScanningState.Scanning
+    )
 
     // region Actions
     fun startScan() {
+        if (_scanningState.value is ScanningState.Scanning) return
+
         // Clean
         _scanningState.update { ScanningState.Scanning(emptyList()) }
 
         // Start Wifi Scan
         if (isWifiScanEnabled) {
             scanningStateWifiJob =
-                wifiPeripheralScanner.wifiPeripheralsFlow.onStart { log.info("wifiPeripheralsFlow start") }
+                wifiPeripheralScanner.wifiPeripheralsFlow
+                    .onStart { log.info("wifiPeripheralsFlow start") }
                     .onEach { wifiPeripherals ->
                         scannedWifiPeripherals = wifiPeripherals.sortedBy { it.createdMillis }
                         updateScanningState()
@@ -70,7 +73,8 @@ class Scanner(
         // Start Bluetooth Scan
         if (isBleScanEnabled) {
             scanningStateBleJob =
-                blePeripheralScanner.blePeripheralsFlow.onStart { log.info("blePeripheralsFlow start") }
+                blePeripheralScanner.blePeripheralsFlow
+                    .onStart { log.info("blePeripheralsFlow start") }
                     .onEach { blePeripherals ->
                         val filteredPeripherals = blePeripherals
                             // Only peripherals that are manufactured by Adafruit

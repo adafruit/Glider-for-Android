@@ -73,7 +73,13 @@ class BlePeripheralScannerImpl(
                 }
             }
 
-/*
+
+    override fun clearBleLastException() {
+        _bleLastException.update { null }
+    }
+
+
+    /*
     // region Actions
     override fun start() {
         if (isRunning) {

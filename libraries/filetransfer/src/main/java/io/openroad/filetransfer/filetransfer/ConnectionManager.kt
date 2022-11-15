@@ -13,6 +13,7 @@ import com.adafruit.glider.utils.LogUtils
 import io.openroad.filetransfer.Peripheral
 import io.openroad.filetransfer.ble.peripheral.BlePeripheral
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScanner
+import io.openroad.filetransfer.ble.utils.BleException
 import io.openroad.filetransfer.ble.utils.BleManager
 import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
 import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScanner
@@ -23,8 +24,8 @@ private const val reconnectTimeout = 5000
 
 class ConnectionManager(
     private val context: Context,
-    blePeripheralScanner: BlePeripheralScanner,
-    wifiPeripheralScanner: WifiPeripheralScanner,
+    private val blePeripheralScanner: BlePeripheralScanner,
+    private val wifiPeripheralScanner: WifiPeripheralScanner,
     private val onBlePeripheralBonded: ((name: String?, address: String) -> Unit)? = null,
     private val onWifiPeripheralGetPasswordForHostName: ((name: String, hostName: String) -> String?)? = null,
     private val externalScope: CoroutineScope = MainScope(),
@@ -66,7 +67,7 @@ class ConnectionManager(
 
     // Data - Public
     var scanningState = scanner.scanningState
-    var isScanning = scanner.isScanning
+    //var isScanning = scanner.isScanning
     val bleScanningLastException = blePeripheralScanner.bleLastException
     val wifiScanningLastException = wifiPeripheralScanner.wifiLastException
     val connectionLastException = _connectionLastException.asStateFlow()
@@ -77,8 +78,13 @@ class ConnectionManager(
     val isReconnectingToBondedPeripherals = _isReconnectingToBondedPeripherals.asStateFlow()
     val peripheralAddressesBeingSetup = _peripheralAddressesBeingSetup.asStateFlow()
 
+    private var isScanning = false
+
     // region Actions
     fun startScan() {
+        if (isScanning) return
+        isScanning = true
+
         scanner.startScan()
 
         peripheralsUpdateJob = scanningState
@@ -101,6 +107,8 @@ class ConnectionManager(
         peripheralsUpdateJob = null
 
         scanner.stopScan()
+
+        isScanning = false
     }
 
     @SuppressLint("InlinedApi")
@@ -110,9 +118,9 @@ class ConnectionManager(
             userSelectedTransferClient = it
             updateSelectedPeripheral()
         } ?: run {
-            connect(peripheral) {
+            connect(peripheral) { result ->
                 // Select the newly connected peripheral
-                userSelectedTransferClient = it
+                userSelectedTransferClient = result.getOrNull()
                 updateSelectedPeripheral()
             }
         }
@@ -172,7 +180,7 @@ class ConnectionManager(
 
     @SuppressLint("InlinedApi")
     @RequiresPermission(allOf = [BLUETOOTH_SCAN, BLUETOOTH_CONNECT])
-    private fun connect(peripheral: Peripheral, completion: (FileTransferClient?) -> Unit) {
+    private fun connect(peripheral: Peripheral, completion: (Result<FileTransferClient>) -> Unit) {
         var fileTransferPeripheral: FileTransferPeripheral? = null
         when (peripheral) {
             is WifiPeripheral -> fileTransferPeripheral = WifiFileTransferPeripheral(peripheral, onGetPasswordForHostName = onWifiPeripheralGetPasswordForHostName)
@@ -181,7 +189,7 @@ class ConnectionManager(
 
         if (fileTransferPeripheral == null) {
             log.severe("Error: can't connect to unknown peripheral type")
-            completion(null)
+            completion(Result.failure(BleException("Can't connect to unknown peripheral type")))
             return
         }
 
@@ -193,7 +201,7 @@ class ConnectionManager(
     @RequiresPermission(allOf = [BLUETOOTH_SCAN, BLUETOOTH_CONNECT])
     fun connect(
         fileTransferPeripheral: FileTransferPeripheral,
-        completion: (FileTransferClient?) -> Unit
+        completion: (Result<FileTransferClient>) -> Unit
     ) {
         _peripheralAddressesBeingSetup.update {
             val newList = it.toMutableList()
@@ -202,31 +210,45 @@ class ConnectionManager(
         }
         fileTransferPeripheral.connectAndSetup(
             externalScope = externalScope,
-        ) { isConnected ->
-            log.info("FileTransferClient connect success: $isConnected")
+        ) { result ->
+            log.info("FileTransferClient connect success: ${result.isSuccess}")
             _peripheralAddressesBeingSetup.update {
                 val newList =
                     it.toMutableList(); newList.remove(fileTransferPeripheral.peripheral.address); newList
             }
 
-            if (isConnected) {
-                val fileTransferClient = FileTransferClient(fileTransferPeripheral)
-                fileTransferClients[fileTransferPeripheral.peripheral.address] = fileTransferClient
+            result.fold(
+                onSuccess = {
+                    val fileTransferClient = FileTransferClient(fileTransferPeripheral)
+                    fileTransferClients[fileTransferPeripheral.peripheral.address] = fileTransferClient
 
-                updateSelectedPeripheral()
+                    updateSelectedPeripheral()
 
-                // If is a Bluetooth Peripheral, add it to managed connections
-                (fileTransferPeripheral as? BleFileTransferPeripheral)?.let {
-                    addPeripheralToAutomaticallyManagedBleConnection(it)
+                    // If is a Bluetooth Peripheral, add it to managed connections
+                    (fileTransferPeripheral as? BleFileTransferPeripheral)?.let {
+                        addPeripheralToAutomaticallyManagedBleConnection(it)
+                    }
+
+                    completion(Result.success(fileTransferClient))
+                },
+                onFailure = {
+                    _connectionLastException.update { Exception("Can't connect to ${fileTransferPeripheral.peripheral.nameOrAddress}") }
+                    completion(Result.failure(it))
                 }
-
-                completion(fileTransferClient)
-            } else {
-                // TODO change callbacks to add internal exception when it fails instead of just isConnected
-                _connectionLastException.update { Exception("Can't connect to ${fileTransferPeripheral.peripheral.nameOrAddress}") }
-                completion(null)
-            }
+            )
         }
+    }
+
+    fun clearConnectionLastException() {
+       _connectionLastException.update { null }
+    }
+
+    fun clearWifiLastException() {
+        wifiPeripheralScanner.clearWifiLastException()
+    }
+
+    fun clearBleLastException() {
+        blePeripheralScanner.clearBleLastException()
     }
 
     fun disconnectFileTransferClient(address: String) {

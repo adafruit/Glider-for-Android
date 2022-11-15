@@ -1,11 +1,13 @@
 package io.openroad.filetransfer
 
+import io.openroad.filetransfer.filetransfer.DirectoryEntry
+
 /**
  * Created by Antonio García (antonio@openroad.es)
  */
 
 // TypeAlias
-typealias PeripheralConnectCompletionHandler = (isConnected: Boolean) -> Unit
+typealias PeripheralConnectCompletionHandler = (Result<Unit>) -> Unit// (isConnected: Boolean) -> Unit
 
 interface Peripheral {
     val name: String?

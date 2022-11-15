@@ -99,6 +99,7 @@ fun PeripheralsScreen(
     LaunchedEffect(bleScanningLastException) {
         bleScanningLastException?.let { bleException ->
             snackBarHostState.showSnackbar(message = "Bluetooth scanning error: $bleException")
+            connectionManager.clearBleLastException()
         }
     }
 
@@ -106,6 +107,7 @@ fun PeripheralsScreen(
     LaunchedEffect(wifiScanningLastException) {
         wifiScanningLastException?.let { nsdException ->
             snackBarHostState.showSnackbar(message = "Wifi scanning error: $nsdException")
+            connectionManager.clearWifiLastException()
         }
     }
 
@@ -113,6 +115,7 @@ fun PeripheralsScreen(
     LaunchedEffect(connectionLastException) {
         connectionLastException?.let { exception ->
             snackBarHostState.showSnackbar(message = "Connection error: ${exception.message}")
+            connectionManager.clearConnectionLastException()
         }
     }
 
@@ -137,7 +140,6 @@ fun PeripheralsScreen(
             }
         },
         onSelectBondedPeripheral = { data ->
-
             try {
                 connectionManager.reconnectToBondedBlePeripherals(
                     setOf(data.address),
@@ -256,6 +258,8 @@ private fun PeripheralsScreenBody(
                     border = BorderStroke(1.dp, Color.Black),
                     onClick = {
                         onDeleteBondedPeripheral?.invoke(address)
+                        isDeleteBondedPeripheralDialogOpen.value = null
+
                     }) {
                     Text("Delete")
                 }
@@ -331,10 +335,10 @@ private fun PeripheralsListByType(
         }
 
         // Bluetooth advertising peripherals
-        val bondedAddresses = bondedPeripherals.map { it.address }
+        //val bondedAddresses = bondedPeripherals.map { it.address }
         val blePeripherals = peripherals
             .filterIsInstance<BlePeripheral>()
-            .filter { !bondedAddresses.contains(it.address) }       // Don't show bonded
+            //.filter { !bondedAddresses.contains(it.address) }       // Don't show bonded
         if (blePeripherals.isNotEmpty()) {
             Column(
                 Modifier.fillMaxWidth(),
@@ -362,7 +366,10 @@ private fun PeripheralsListByType(
         }
 
         // Bluetooth bonded peripherals
-        if (bondedPeripherals.isNotEmpty()) {
+        val blePeripheralsAddresses = blePeripherals.map { it.address }
+        val bondedNotAdvertisingPeripherals = bondedPeripherals
+            .filter { !blePeripheralsAddresses.contains(it.address)}     // Don't show if advertising
+        if (bondedNotAdvertisingPeripherals.isNotEmpty()) {
             Column(
                 Modifier.fillMaxWidth(),
                 verticalArrangement = spacedBy(12.dp),
@@ -375,7 +382,7 @@ private fun PeripheralsListByType(
                 )
 
                 BondedBlePeripheralsList(
-                    bondedBlePeripherals = bondedPeripherals,
+                    bondedBlePeripherals = bondedNotAdvertisingPeripherals,
                     selectedPeripheral = selectedPeripheral,
                     onSelectPeripheral = onSelectBondedPeripheral,
                     peripheralAddressesBeingSetup = peripheralAddressesBeingSetup,
@@ -520,6 +527,7 @@ private fun PeripheralButton(
                     details = details,
                     isSelected = isSelected,
                     state = state,
+                    mainColor = mainColor,
                 )
             }
         } else {
@@ -540,7 +548,8 @@ private fun PeripheralButton(
                     details = details,
                     isSelected = isSelected,
                     state = state,
-                )
+                    mainColor = mainColor,
+                    )
             }
         }
 
@@ -579,6 +588,7 @@ private fun PeripheralName(
     details: String?,
     isSelected: Boolean,
     state: PeripheralButtonState,
+    mainColor: Color,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -605,7 +615,7 @@ private fun PeripheralName(
         when (state) {
             PeripheralButtonState.Wait -> {
                 CircularProgressIndicator(
-                    color = Color.White,
+                    color = mainColor,
                     strokeWidth = 2.dp,
                     modifier = Modifier
                         .offset(x = 12.dp)      // Offset because there a big trailing padding to the button border

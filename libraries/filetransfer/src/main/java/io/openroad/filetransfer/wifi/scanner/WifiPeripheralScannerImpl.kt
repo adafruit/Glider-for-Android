@@ -51,6 +51,10 @@ class WifiPeripheralScannerImpl(
                 emit(knownWifiPeripherals.toList())
             }
 
+    override fun clearWifiLastException() {
+        _wifiLastException.update { null }
+    }
+
     // region Utils
     @Synchronized
     private fun updateWifiPeripheralsWithScanResult(scanResult: NsdServiceInfoScanner.NsdScanResult) {
@@ -75,5 +79,6 @@ class WifiPeripheralScannerImpl(
             knownWifiPeripherals.add(wifiPeripheral)
         }
     }
+
     // endregion
 }

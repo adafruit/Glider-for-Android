@@ -7,7 +7,6 @@ package com.adafruit.glider.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -17,9 +16,6 @@ import com.adafruit.glider.ui.connected.ConnectedNavigationScreen
 import com.adafruit.glider.ui.fileexplorer.FileEditScaffoldingScreen
 import com.adafruit.glider.ui.fileexplorer.FileSystemViewModel
 import com.adafruit.glider.ui.fileexplorer.SelectDirectoryScreen
-import com.adafruit.glider.ui.scan.ScanScreen
-import com.adafruit.glider.ui.scan.ScanViewModel
-import com.adafruit.glider.ui.startup.StartupScreen
 
 // Config
 val initialDestination = GliderDestinations.ConnectedBottomNavigation.route     // Debug
@@ -37,6 +33,7 @@ fun GliderNavGraph(
         startDestination = startDestination,
         modifier = modifier
     ) {
+        /*
         // Startup
         composable(GliderDestinations.Startup.route) {
             StartupScreen() {
@@ -75,7 +72,7 @@ fun GliderNavGraph(
                     }
                 }
             }
-        }
+        }*/
 
         // ConnectedBottomNavigation
         composable(GliderDestinations.ConnectedBottomNavigation.route) {

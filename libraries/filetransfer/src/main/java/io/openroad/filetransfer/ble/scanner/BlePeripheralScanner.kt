@@ -11,9 +11,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface BlePeripheralScanner {
     val isRunning: Boolean
-    val bleLastException : StateFlow<BleException?>
+    val bleLastException: StateFlow<BleException?>
     val blePeripherals: StateFlow<List<BlePeripheral>>
 
+    fun clearBleLastException()
     /*
     // Actions
     fun start()

@@ -47,7 +47,6 @@ import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
 import io.openroad.filetransfer.wifi.scanner.NsdScanException
 import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun ScanScreen(

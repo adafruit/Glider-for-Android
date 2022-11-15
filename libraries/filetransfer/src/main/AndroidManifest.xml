@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Multicast permission due to some bugs with NsdManager: https://stackoverflow.com/questions/53615125/nsdmanager-discovery-does-not-work-on-android-9-->
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <!-- Bluetooth permission is required on Android 4.3 - 11 in order to communicate with Bluetooth LE devices. -->
     <uses-permission
@@ -33,4 +33,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
 
+    <!-- Important: Add usesCleartextTraffic to the app manifest. Example:
+        <application android:usesCleartextTraffic="true" />
+    -->
 </manifest>
