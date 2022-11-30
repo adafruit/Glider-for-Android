@@ -51,6 +51,7 @@ const val kMakeDirectoryResponseHeaderSize = 16         // (1+1+6+8)
 const val kDeleteFileResponseHeaderSize = 2             // (1+1)
 const val kMoveFileResponseHeaderSize = 2               // (1+1)
 
+const val kForceEnableNotifyEvenIfAlreadyEnabled = true     // Force enable notify. Solves problem with notify not set for bonded devices on CircuitPython
 
 class BleFileTransferPeripheral(
     override val peripheral: BlePeripheral,
@@ -703,8 +704,8 @@ class BleFileTransferPeripheral(
                 completion?.let { it(Result.success(writeDate)) }
 
             } else {
-                val chunkSize = freeSpace.coerceIn(0, 25)
-                //val chunkSize = freeSpace.coerceIn(0, peripheral.mtuSize - kWriteChunkHeaderSize)
+                //val chunkSize = freeSpace.coerceIn(0, 25)
+                val chunkSize = freeSpace.coerceIn(0, peripheral.mtuSize - kWriteChunkHeaderSize - 4)           // - 4 because it fails if closer to the MTU size (maybe CircuitPython is not handling all the mtusize message)
                 writeFileChunk(offset = offset, chunkSize = chunkSize) { result ->
                     val exception = result.exceptionOrNull()
                     if (exception != null) {
@@ -963,7 +964,7 @@ class BleFileTransferPeripheral(
             }
 
             // Enable (or update) notifications. Note: check if a notify handler is registered because even if the notify flag is set we need to be sure than our notification handler is registered or we will miss notifications
-            if (!peripheral.isCharacteristicNotifyingForCachedClientConfigDescriptor(characteristic) || peripheral.isNotifyHandlerRegistered(characteristic)) {
+            if (kForceEnableNotifyEvenIfAlreadyEnabled || (!peripheral.isCharacteristicNotifyingForCachedClientConfigDescriptor(characteristic) || peripheral.isNotifyHandlerRegistered(characteristic))) {
                 peripheral.characteristicEnableNotify(characteristic, notifyHandler, completion)
             } else {
                 peripheral.characteristicUpdateNotify(characteristic, notifyHandler)
