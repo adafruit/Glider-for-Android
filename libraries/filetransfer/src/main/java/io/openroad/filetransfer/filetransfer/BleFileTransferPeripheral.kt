@@ -51,6 +51,7 @@ const val kMakeDirectoryResponseHeaderSize = 16         // (1+1+6+8)
 const val kDeleteFileResponseHeaderSize = 2             // (1+1)
 const val kMoveFileResponseHeaderSize = 2               // (1+1)
 
+
 class BleFileTransferPeripheral(
     override val peripheral: BlePeripheral,
     private val onBonded: ((name: String?, address: String) -> Unit)?,
@@ -961,11 +962,8 @@ class BleFileTransferPeripheral(
                 return@readDescriptor
             }
 
-            // Enable (or update) notifications
-            if (!peripheral.isCharacteristicNotifyingForCachedClientConfigDescriptor(
-                    characteristic
-                )
-            ) {
+            // Enable (or update) notifications. Note: check if a notify handler is registered because even if the notify flag is set we need to be sure than our notification handler is registered or we will miss notifications
+            if (!peripheral.isCharacteristicNotifyingForCachedClientConfigDescriptor(characteristic) || peripheral.isNotifyHandlerRegistered(characteristic)) {
                 peripheral.characteristicEnableNotify(characteristic, notifyHandler, completion)
             } else {
                 peripheral.characteristicUpdateNotify(characteristic, notifyHandler)

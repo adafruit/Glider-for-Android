@@ -19,14 +19,13 @@ import androidx.annotation.IntRange
 import androidx.annotation.MainThread
 import androidx.annotation.RequiresPermission
 import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.BuildConfig
 import io.openroad.filetransfer.Peripheral
 import io.openroad.filetransfer.PeripheralConnectCompletionHandler
 import io.openroad.filetransfer.ble.bond.BleBondState
 import io.openroad.filetransfer.ble.bond.BleBondStateDataSource
 import io.openroad.filetransfer.ble.state.BleState
 import io.openroad.filetransfer.ble.utils.*
-import io.openroad.filetransfer.BuildConfig
-import io.openroad.filetransfer.ble.utils.applicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
@@ -64,7 +63,10 @@ class BlePeripheral(
         //_scanResult.value = scanResult
     }
 
-    constructor(bluetoothDevice: BluetoothDevice, externalScope: CoroutineScope = MainScope()) : this(
+    constructor(
+        bluetoothDevice: BluetoothDevice,
+        externalScope: CoroutineScope = MainScope()
+    ) : this(
         bluetoothDevice = bluetoothDevice,
         scanRecord = null,
         externalScope = externalScope,
@@ -242,7 +244,7 @@ class BlePeripheral(
     fun connect(
         shouldRetryConnection: Boolean = true,
         connectionTimeout: Int? = null,
-        onBonded:((name: String?, address: String)->Unit)?,
+        onBonded: ((name: String?, address: String) -> Unit)?,
         completion: PeripheralConnectCompletionHandler
     ) {
         // Confirm that ble state is enabled
@@ -482,7 +484,7 @@ class BlePeripheral(
             override fun execute() {
                 val descriptor = characteristic.getDescriptor(kClientCharacteristicConfigUUID)
                 if (bluetoothGatt != null && descriptor != null && characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0) {
-                    Log.d("test", "enable notify:" + characteristic.uuid.toString())
+                    //Log.d("test", "enable notify:" + characteristic.uuid.toString())
 
                     notifyHandlers[identifier] = notifyHandler
                     bluetoothGatt!!.setCharacteristicNotification(characteristic, true)
@@ -541,16 +543,22 @@ class BlePeripheral(
         commandQueue.add(command)
     }
 
+
+    fun isNotifyHandlerRegistered(characteristic: BluetoothGattCharacteristic): Boolean {
+        val identifier = getCharacteristicIdentifier(characteristic)
+        return notifyHandlers[identifier] != null
+    }
+
     fun characteristicUpdateNotify(
         characteristic: BluetoothGattCharacteristic,
         notifyHandler: NotifyHandler
     ) {
-        log.info("udpate notify:" + characteristic.uuid.toString())
+        log.info("update notify: ${characteristic.uuid}")
 
         val identifier = getCharacteristicIdentifier(characteristic)
         val previousNotifyHandler = notifyHandlers.put(identifier, notifyHandler)
         if (previousNotifyHandler == null) {
-            log.info("trying to update nonexistent notifyHandler for characteristic: " + characteristic.uuid.toString())
+            log.warning("trying to update nonexistent notifyHandler for characteristic: ${characteristic.uuid}")
         }
     }
 
@@ -664,7 +672,10 @@ class BlePeripheral(
                 @RequiresPermission(value = BLUETOOTH_CONNECT)
                 override fun execute() {
                     if (bluetoothGatt != null) {
-                        Log.d("test", "write characteristic:" + characteristic.uuid.toString()+ " data size: ${data.size}")
+                        Log.d(
+                            "test",
+                            "write characteristic:" + characteristic.uuid.toString() + " data size: ${data.size}"
+                        )
 
                         // Write value
                         characteristic.writeType = writeType
@@ -880,7 +891,7 @@ class BlePeripheral(
         ) {
             super.onCharacteristicRead(gatt, characteristic, status)
 
-            log.info("onCharacteristicRead: ${characteristic.uuid.toString()}")
+            log.info("onCharacteristicRead: ${characteristic.uuid}")
             if (kDebugCommands) {
                 val identifier = getCharacteristicIdentifier(characteristic)
                 val command = commandQueue.first()
@@ -909,7 +920,7 @@ class BlePeripheral(
             characteristic: BluetoothGattCharacteristic
         ) {
             super.onCharacteristicChanged(gatt, characteristic)
-            log.info("onCharacteristicChanged. numCaptureReadHandlers: " + captureReadHandlers.size)
+            log.info("onCharacteristicChanged: ${characteristic.uuid}. numCaptureReadHandlers: " + captureReadHandlers.size)
             val identifier: String = getCharacteristicIdentifier(characteristic)
             val status =
                 BluetoothGatt.GATT_SUCCESS // On Android, there is no error reported for this callback, so we assume it is SUCCESS
@@ -936,7 +947,7 @@ class BlePeripheral(
 
                 // Send result
                 val value = characteristic.value
-                //log.info("onCharacteristicChanged: send result to captureReadHandler:" + value.toHexString())
+                //log.info("\tonCharacteristicChanged: send result to captureReadHandler:" + value.toHexString())
                 captureReadHandler.result(status, value)
                 isNotifyOmitted = captureReadHandler.isNotifyOmitted
             }
@@ -944,7 +955,7 @@ class BlePeripheral(
             // Notify
             if (!isNotifyOmitted) {
                 val notifyHandler = notifyHandlers[identifier]
-                //log.info("onCharacteristicChanged. notify: ${if (notifyHandler == null) "no" else "yes"}")
+                //log.info("\tonCharacteristicChanged. notify: ${if (notifyHandler == null) "no" else "yes"}")
                 notifyHandler?.let { it(status) }
             }
 
