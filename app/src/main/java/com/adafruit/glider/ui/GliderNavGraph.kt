@@ -7,39 +7,33 @@ package com.adafruit.glider.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.adafruit.glider.AppContainer
 import com.adafruit.glider.ui.connected.ConnectedNavigationScreen
-import com.adafruit.glider.ui.fileexplorer.FileCommandsViewModel
 import com.adafruit.glider.ui.fileexplorer.FileEditScaffoldingScreen
 import com.adafruit.glider.ui.fileexplorer.FileSystemViewModel
 import com.adafruit.glider.ui.fileexplorer.SelectDirectoryScreen
-import com.adafruit.glider.ui.scan.ScanScreen
-import com.adafruit.glider.ui.scan.ScanViewModel
-import com.adafruit.glider.ui.startup.StartupScreen
+
+// Config
+val initialDestination = GliderDestinations.ConnectedBottomNavigation.route     // Debug
+//val initialDestination =GliderDestinations.Scan.route,       // GliderDestinations.Startup
 
 @Composable
 fun GliderNavGraph(
     appContainer: AppContainer,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    startDestination: String = GliderDestinations.Scan.route,
+    startDestination: String = initialDestination
 ) {
-
-    // Navigation Actions
-    val navigationActions = remember(navController) {
-        GliderNavigationActions(navController)
-    }
-
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier
     ) {
+        /*
         // Startup
         composable(GliderDestinations.Startup.route) {
             StartupScreen() {
@@ -57,7 +51,16 @@ fun GliderNavGraph(
         // Scan
         composable(GliderDestinations.Scan.route) {
             val scanViewModel: ScanViewModel =
-                viewModel(factory = ScanViewModel.provideFactory(appContainer.connectionManager))
+                viewModel(
+                    factory = ScanViewModel.provideFactory(
+                        connectionManager = appContainer.connectionManager,
+                        isAutoConnectEnabled = true,
+
+                        // TODO: move all management inside ConnectionManager and remove the following callbacks
+                        onBlePeripheralBonded = {name, address ->  TODO() },
+                        onWifiPeripheralGetPasswordForHostName = {  _, hostName -> TODO() },
+                    )
+                )
 
             ScanScreen(viewModel = scanViewModel) { fileTransferClient ->
                 // on device selected -> go to connected
@@ -68,15 +71,17 @@ fun GliderNavGraph(
                         inclusive = true
                     }
                 }
-
             }
-        }
+        }*/
 
         // ConnectedBottomNavigation
         composable(GliderDestinations.ConnectedBottomNavigation.route) {
+
             ConnectedNavigationScreen(
                 navController = navController,
-                connectionManager = appContainer.connectionManager
+                connectionManager = appContainer.connectionManager,
+                savedBondedBlePeripherals = appContainer.savedBondedBlePeripherals,
+                savedSettingsWifiPeripherals = appContainer.savedSettingsWifiPeripherals,
             )
         }
 
@@ -115,21 +120,20 @@ fun GliderNavGraph(
                             toPath = selectedPath,
                             fileTransferClient = fileTransferClient
                         ) { result ->
-                           result.fold(
-                               onSuccess = {
-                                   navController.popBackStack()
-                               },
-                               onFailure = {
-                                   // Do nothing
-                               }
-                           )
+                            result.fold(
+                                onSuccess = {
+                                    navController.popBackStack()
+                                },
+                                onFailure = {
+                                    // Do nothing
+                                }
+                            )
 
                         }
                     } ?: run {
                         navController.popBackStack()
                     }
-                }
-                else {
+                } else {
                     navController.popBackStack()
                 }
             }

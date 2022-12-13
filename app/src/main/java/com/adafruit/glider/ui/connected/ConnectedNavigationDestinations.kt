@@ -8,14 +8,14 @@ package com.adafruit.glider.ui.connected
  * Destinations used in the connected bottom navigation
  */
 sealed class ConnectedNavigationDestinations(val route: String) {
-    object Info : ConnectedNavigationDestinations("info")
+    object Peripherals : ConnectedNavigationDestinations("peripherals")
     object FileExplorer : ConnectedNavigationDestinations("fileExplorer")
     object Log : ConnectedNavigationDestinations("log")
 
     companion object {
         fun fromRoute(route: String?): ConnectedNavigationDestinations =
             when (route?.substringBefore("/")) {
-                Info.route -> Info
+                Peripherals.route -> Peripherals
                 FileExplorer.route -> FileExplorer
                 Log.route -> Log
                 null -> FileExplorer
@@ -25,7 +25,7 @@ sealed class ConnectedNavigationDestinations(val route: String) {
 
     fun title(): String =
         when (this) {
-            is Info -> "Info"
+            is Peripherals -> "Scanning Peripherals..."
             is FileExplorer -> "File Explorer"
             is Log -> "Log"
         }

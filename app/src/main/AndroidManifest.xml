@@ -2,13 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Internet -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- Multicast permission due to some bugs with NsdManager: https://stackoverflow.com/questions/53615125/nsdmanager-discovery-does-not-work-on-android-9-->
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
-
     <application
         android:name=".GliderApplication"
         android:allowBackup="true"
@@ -20,6 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Glider"
         android:usesCleartextTraffic="true"
+        android:windowSoftInputMode="adjustResize"
         tools:targetApi="32">
         <activity
             android:name=".MainActivity"
@@ -31,6 +25,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+
+            <meta-data
+                android:name="io.openroad.filetransfer.ble.utils.BleInitializer"
+                android:value="androidx.startup" />
+        </provider>
     </application>
 
 </manifest>

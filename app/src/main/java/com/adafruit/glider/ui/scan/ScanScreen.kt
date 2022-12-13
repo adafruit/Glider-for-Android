@@ -5,11 +5,13 @@ package com.adafruit.glider.ui.scan
  */
 
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,9 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Devices
@@ -28,27 +28,56 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.openroad.filetransfer.FileTransferClient
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.Peripheral
-import io.openroad.wifi.scanner.WifiPeripheralScannerFake
+import com.adafruit.glider.ui.components.BackgroundGradient
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.components.GliderSnackbarHost
-import com.adafruit.glider.ui.components.BackgroundGradient
 import com.adafruit.glider.ui.theme.AccentMain
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.utils.observeAsState
-import io.openroad.wifi.scanner.NsdScanException
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import io.openroad.filetransfer.Config
+import io.openroad.filetransfer.Peripheral
+import io.openroad.filetransfer.ble.peripheral.BlePeripheral
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
+import io.openroad.filetransfer.ble.utils.BleManager
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.filetransfer.FileTransferClient
+import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
+import io.openroad.filetransfer.wifi.scanner.NsdScanException
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun ScanScreen(
     viewModel: ScanViewModel,
     onSelected: (FileTransferClient) -> Unit,
 ) {
+    // Permissions
+    val isInitialPermissionsCheckInProgress: Boolean
+    if (LocalInspectionMode.current) {
+        // Simulate permissions for Compose Preview
+        isInitialPermissionsCheckInProgress = false
+    } else {
+        // Check Bluetooth-related permissions state
+        val bluetoothPermissionState =
+            rememberMultiplePermissionsState(Config.getNeededPermissions())
+
+        isInitialPermissionsCheckInProgress =
+            !bluetoothPermissionState.allPermissionsGranted && !bluetoothPermissionState.shouldShowRationale
+        LaunchedEffect(isInitialPermissionsCheckInProgress) {
+            if (isInitialPermissionsCheckInProgress) {
+                // First time that permissions are needed at startup
+                bluetoothPermissionState.launchMultiplePermissionRequest()
+            } else {
+                // Permissions ready
+            }
+        }
+    }
+
     // Start / Stop scanning based on lifecycle
     val lifeCycleState = LocalLifecycleOwner.current.lifecycle.observeAsState()
-    if (lifeCycleState.value == Lifecycle.Event.ON_RESUME) {
+    if (!isInitialPermissionsCheckInProgress && lifeCycleState.value == Lifecycle.Event.ON_RESUME) {
         LaunchedEffect(lifeCycleState) {
             viewModel.onResume()
         }
@@ -63,7 +92,7 @@ fun ScanScreen(
     val snackBarHostState = remember { SnackbarHostState() }
 
     when (val state = uiState) {
-        is ScanViewModel.UiState.ScanningError -> {
+        is ScanViewModel.UiState.Error -> {
             // Show snackBar if state is ScanningError
             val cause = state.cause
             LaunchedEffect(cause) {
@@ -100,7 +129,6 @@ fun ScanScreen(
             )
         }
     }
-
 }
 
 @Composable
@@ -133,7 +161,7 @@ private fun Info(
     onRestartScanning: () -> Unit = {}
 ) {
     // Status
-    //Crossfade(targetState = uiState) { state ->
+
     when (uiState) {
         ScanViewModel.UiState.Startup -> {
             Text(
@@ -144,12 +172,13 @@ private fun Info(
         is ScanViewModel.UiState.Scanning -> {
             InfoScanning(peripherals = uiState.peripherals, selectedPeripheral = null)
         }
+        /*
         is ScanViewModel.UiState.PreparingConnection -> {
             InfoScanning(
                 peripherals = uiState.peripherals,
                 selectedPeripheral = uiState.selectedPeripheral
             )
-        }
+        }*/
         is ScanViewModel.UiState.Connecting -> {
             InfoPeripheral(text = "Connecting to:\n${uiState.peripheral.nameOrAddress}")
         }
@@ -159,7 +188,7 @@ private fun Info(
         is ScanViewModel.UiState.FileTransferEnabled -> {
             InfoPeripheral(text = "Enabled:\n${uiState.client.peripheral.nameOrAddress}")
         }
-        is ScanViewModel.UiState.ScanningError -> {
+        is ScanViewModel.UiState.Error -> {
 
             Column(
                 modifier = Modifier
@@ -185,16 +214,15 @@ private fun Info(
                 }
 
             }
-        }
+        }/*
         else -> {
             Text(
                 "[Debug] Internal state: $uiState",
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
             )
-        }
+        }*/
     }
-    // }
 }
 
 @Composable
@@ -207,7 +235,10 @@ private fun InfoPeripheral(text: String) {
 }
 
 @Composable
-private fun InfoScanning(peripherals: List<Peripheral>, selectedPeripheral: Peripheral?) {
+private fun InfoScanning(
+    peripherals: List<Peripheral>,
+    selectedPeripheral: Peripheral?,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -222,11 +253,24 @@ private fun InfoScanning(peripherals: List<Peripheral>, selectedPeripheral: Peri
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
-        /*
-        Text(
-            "Wifi peripherals detected: ${peripherals.size}",
-            color = Color.LightGray,
-        )*/
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val wifiPeripherals = peripherals.filterIsInstance<WifiPeripheral>()
+            val blePeripherals = peripherals.filterIsInstance<BlePeripheral>()
+            Text(
+                "Wifi peripherals detected: ${wifiPeripherals.size}",
+                color = Color.LightGray,
+            )
+            Text(
+                "Bluetooth peripherals detected: ${blePeripherals.size}",
+                color = Color.LightGray,
+            )
+        }
+
         selectedPeripheral?.let {
             Text(
                 "Selected: ${selectedPeripheral.nameOrAddress}",
@@ -314,7 +358,7 @@ private fun Waves(modifier: Modifier = Modifier) {
                 .background(Color.White)
         )
 
-        Icon(Icons.Rounded.Wifi, null, tint = AccentMain, modifier = Modifier.size(48.dp))
+        Icon(Icons.Rounded.Sensors, null, tint = AccentMain, modifier = Modifier.size(48.dp))
     }
 }
 
@@ -357,10 +401,15 @@ private fun Wave(color: Color = Color.Black, scale: Float = 1f, lineWidth: Float
 @Composable
 fun ScanSmartphonePreview() {
     GliderTheme {
-        val connectionManager = ConnectionManager(WifiPeripheralScannerFake())
+        val connectionManager =
+            ConnectionManager(
+                LocalContext.current,
+                BlePeripheralScannerFake(),
+                WifiPeripheralScannerFake()
+            )
 
         val scanViewModel: ScanViewModel = viewModel(
-            factory = ScanViewModel.provideFactory(connectionManager)
+            factory = ScanViewModel.provideFactory(connectionManager, true)
         )
 
         ScanScreen(
@@ -419,7 +468,7 @@ fun ScanInfoErrorPreview() {
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Info(ScanViewModel.UiState.ScanningError(NsdScanException(errorCode = 123)))
+                Info(ScanViewModel.UiState.Error(NsdScanException(errorCode = 123)))
             }
         }
     }

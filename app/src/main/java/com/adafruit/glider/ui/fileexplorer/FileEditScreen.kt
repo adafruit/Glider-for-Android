@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -25,11 +26,12 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.GliderTheme
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.utils.filenameFromPath
-import io.openroad.wifi.scanner.WifiPeripheralScannerFake
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.utils.filenameFromPath
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FileEditScaffoldingScreen(
     connectionManager: ConnectionManager,
@@ -39,6 +41,7 @@ fun FileEditScaffoldingScreen(
     val title = filenameFromPath(path)
 
     Scaffold(
+        contentWindowInsets = if (WindowInsets.isImeVisible) WindowInsets.ime else  WindowInsets.navigationBars,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(title) },
@@ -66,6 +69,7 @@ fun FileEditScaffoldingScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun FileEditScreen(
     modifier: Modifier = Modifier,
@@ -89,7 +93,7 @@ fun FileEditScreen(
     val text by viewModel.text.collectAsState()
 
     val isTransmitting by viewModel.isTransmitting.collectAsState()
-    val isLoading by connectionManager.isReconnectingToCurrentPeripheral.collectAsState()
+    val isLoading by connectionManager.isReconnectingToBondedPeripherals.collectAsState()
     val isInteractionDisabled = isTransmitting || isLoading
     val mainColor = Color.White.copy(alpha = 0.7f)
     var editedText by remember { mutableStateOf("") }
@@ -110,12 +114,14 @@ fun FileEditScreen(
                 .weight(1.0f)
                 .clip(RoundedCornerShape(4.dp))
         ) {
+
             TextField(
                 value = editedText,
                 onValueChange = {
                     editedText = it
                 },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize(),
                 label = null,
                 shape = RoundedCornerShape(8.dp),
                 colors = TextFieldDefaults.textFieldColors(
@@ -209,7 +215,11 @@ fun FileEditScreen(
 @Preview(showSystemUi = true)
 @Composable
 private fun FileEditScreenPreview() {
-    val connectionManager = ConnectionManager(WifiPeripheralScannerFake())
+    val connectionManager = ConnectionManager(
+        LocalContext.current,
+        BlePeripheralScannerFake(),
+        WifiPeripheralScannerFake()
+    )
 
     GliderTheme {
         FileEditScaffoldingScreen(connectionManager = connectionManager, path = "file.txt")

@@ -7,11 +7,11 @@ package com.adafruit.glider.ui.fileexplorer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adafruit.glider.utils.LogUtils
-import io.openroad.filetransfer.DirectoryEntry
-import io.openroad.filetransfer.FileTransferClient
-import io.openroad.filetransfer.TransmissionLog
-import io.openroad.filetransfer.TransmissionProgress
-import io.openroad.utils.isRootDirectory
+import io.openroad.filetransfer.filetransfer.DirectoryEntry
+import io.openroad.filetransfer.filetransfer.FileTransferClient
+import io.openroad.filetransfer.filetransfer.TransmissionLog
+import io.openroad.filetransfer.filetransfer.TransmissionProgress
+import io.openroad.filetransfer.utils.isRootDirectory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -23,32 +23,27 @@ open class FileCommandsViewModel : ViewModel() {
 
     // Data
     private val log by LogUtils()
-
-    // State
     private val _isRootDirectory = MutableStateFlow(true)
-    val isRootDirectory = _isRootDirectory.asStateFlow()
-
     private val _entries = MutableStateFlow<List<DirectoryEntry>>(
         emptyList()
-        /*
-        listOf(
-            BleFileTransferPeripheral.DirectoryEntry(name = "cosa", type = BleFileTransferPeripheral.DirectoryEntry.EntryType.File(344)),
-        )*/
     )
-    val entries = _entries.asStateFlow()
     internal val _path = MutableStateFlow("")
-    val path = _path.asStateFlow()
 
     private val _isTransmitting = MutableStateFlow(false)
-    val isTransmitting = _isTransmitting.asStateFlow()
     private val _transmissionProgress = MutableStateFlow<TransmissionProgress?>(null)
-    val transmissionProgress = _transmissionProgress.asStateFlow()
     private val _lastTransmit = MutableStateFlow<TransmissionLog?>(null)
+
+    // State
+    val isRootDirectory = _isRootDirectory.asStateFlow()
+
+    val entries = _entries.asStateFlow()
+    val path = _path.asStateFlow()
+
+    val isTransmitting = _isTransmitting.asStateFlow()
+    val transmissionProgress = _transmissionProgress.asStateFlow()
     val lastTransmit = _lastTransmit.asStateFlow()
-    //MutableStateFlow(TransmissionLog(TransmissionLog.TransmissionType.Write(334, null)))
 
     // region Actions
-
     fun listDirectory(directory: String, fileTransferClient: FileTransferClient) {
         startCommand(description = "List directory")
 
@@ -105,8 +100,7 @@ open class FileCommandsViewModel : ViewModel() {
             _isTransmitting.update { false }
 
             result.fold(
-                onSuccess = { date ->
-
+                onSuccess = { _ ->      // date
                     listDirectory(this.path.value, fileTransferClient)
 
                     _lastTransmit.update {
@@ -180,7 +174,6 @@ open class FileCommandsViewModel : ViewModel() {
                         )
                     }
                     completion?.let { it(Result.success(data)) }
-
                 },
 
                 onFailure = { exception ->
@@ -246,7 +239,6 @@ open class FileCommandsViewModel : ViewModel() {
                         completion?.let { it(Result.failure(exception)) }
                     }
                 )
-
                 endCommand()
             })
     }

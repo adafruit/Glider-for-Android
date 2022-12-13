@@ -22,8 +22,8 @@ import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
 import com.adafruit.glider.ui.theme.WarningBackground
 import com.adafruit.glider.utils.capitalized
-import io.openroad.filetransfer.TransmissionLog
-import io.openroad.filetransfer.TransmissionProgress
+import io.openroad.filetransfer.filetransfer.TransmissionLog
+import io.openroad.filetransfer.filetransfer.TransmissionProgress
 
 @Composable
 fun FileCommandStatusBarView(

@@ -1,0 +1,3 @@
+[submodule "libraries/filetransfer"]
+	path = libraries/filetransfer
+	url = git@github.com:adafruit/FileTransfer-For-Android.git

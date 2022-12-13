@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.GliderTheme
-import com.adafruit.glider.utils.LogManager
+import io.openroad.filetransfer.ble.utils.LogManager
 import java.util.logging.Level
 
 @Composable

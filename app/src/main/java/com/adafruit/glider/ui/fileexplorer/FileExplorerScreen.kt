@@ -19,17 +19,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.adafruit.glider.ui.components.ConfirmActionDialog
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
+import com.adafruit.glider.ui.components.InputTextActionDialog
 import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
-import io.openroad.filetransfer.ConnectionManager
-import io.openroad.wifi.scanner.WifiPeripheralScannerFake
+import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
+import io.openroad.filetransfer.filetransfer.ConnectionManager
+import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
 @Composable
 fun FileExplorerScreen(
@@ -40,11 +42,53 @@ fun FileExplorerScreen(
     onShowSelectDirectory: (String) -> Unit,
     onFileSelected: (String) -> Unit,
 ) {
+    val fileTransferClient by connectionManager.currentFileTransferClient.collectAsState()
+
+    // Empty state
+    if (fileTransferClient == null) {
+        Column(
+            modifier = modifier.padding(40.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = spacedBy(12.dp),
+        ) {
+            Text(
+                "No peripheral selected".uppercase(),
+                textAlign = TextAlign.Center,
+            )
+
+            Text(
+                "Select a peripheral on the 'Peripherals' tab to start using the File Explorer",
+                textAlign = TextAlign.Center,
+                color = Color.LightGray,
+            )
+        }
+
+    } else {
+        FileExplorerBody(
+            modifier = modifier,
+            viewModel = viewModel,
+            connectionManager = connectionManager,
+            snackBarHostState = snackBarHostState,
+            onShowSelectDirectory = onShowSelectDirectory,
+            onFileSelected = onFileSelected
+        )
+    }
+}
+
+@Composable
+fun FileExplorerBody(
+    modifier: Modifier,
+    viewModel: FileSystemViewModel = viewModel(),
+    connectionManager: ConnectionManager,
+    snackBarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onShowSelectDirectory: (String) -> Unit,
+    onFileSelected: (String) -> Unit,
+) {
     val outlineColor = ControlsOutline
     var path by remember { mutableStateOf("/") }
 
     val fileTransferClient by connectionManager.currentFileTransferClient.collectAsState()
-    val isReconnecting by connectionManager.isReconnectingToCurrentPeripheral.collectAsState()
+    val isReconnecting by connectionManager.isReconnectingToBondedPeripherals.collectAsState()
     val peripheralName = fileTransferClient?.peripheral?.nameOrAddress
 
     // Reconnecting snackbar
@@ -57,6 +101,7 @@ fun FileExplorerScreen(
     }
 
     // UI
+    val mainColor = ControlsOutline
     Column(
         modifier = modifier.padding(20.dp),
         verticalArrangement = spacedBy(12.dp),
@@ -70,13 +115,15 @@ fun FileExplorerScreen(
             ) {
                 Text("Selected Peripheral", style = MaterialTheme.typography.labelSmall)
 
-                Button(
-                    onClick = { /*TODO*/ },
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = outlineColor, contentColor = Color.Black
+                OutlinedButton(
+                    onClick = { /*Do nothing*/ },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        //containerColor = outlineColor,
+                        contentColor = mainColor//Color.Black
                     ),
+                    border = BorderStroke(1.dp, mainColor),
                     shape = RoundedCornerShape(8.dp),
-                    enabled = !isReconnecting,
+                    //enabled = !isReconnecting,
                     modifier = Modifier.height(IntrinsicSize.Min),
                     contentPadding = PaddingValues(8.dp),
                 ) {
@@ -225,7 +272,7 @@ private fun InputTextActionButton(
 
     // New Directory Alert
     if (isDialogOpen.value) {
-        ConfirmActionDialog(
+        InputTextActionDialog(
             alertText = alertText,
             alertMessage = alertMessage,
             placeholderText = placeholderText,
@@ -245,7 +292,11 @@ private fun InputTextActionButton(
 @Composable
 private fun FileExplorerScreenPreview() {
     GliderTheme {
-        val connectionManager = ConnectionManager(WifiPeripheralScannerFake())
+        val connectionManager = ConnectionManager(
+            LocalContext.current,
+            BlePeripheralScannerFake(),
+            WifiPeripheralScannerFake(),
+        )
 
         BackgroundGradientFillMaxSize {
             FileExplorerScreen(

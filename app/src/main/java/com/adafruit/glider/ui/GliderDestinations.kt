@@ -4,7 +4,6 @@ package com.adafruit.glider.ui
  * Created by Antonio García (antonio@openroad.es)
  */
 
-import androidx.navigation.NavHostController
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -13,8 +12,8 @@ import java.nio.charset.StandardCharsets
  * Destinations used in the app
  */
 sealed class GliderDestinations(val route: String) {
-    object Startup : GliderDestinations("startup")
-    object Scan : GliderDestinations("scan")
+    //object Startup : GliderDestinations("startup")
+    //object Scan : GliderDestinations("scan")
     object ConnectedBottomNavigation : GliderDestinations("connectedTab")
     object FileEdit : GliderDestinations("fileEdit/{path}") {
         fun createRoute(path: String): String {
@@ -50,6 +49,6 @@ sealed class GliderDestinations(val route: String) {
 /**
  * Models the navigation actions in the app.
  */
+/*
 class GliderNavigationActions(navController: NavHostController) {
-
-}
+}*/

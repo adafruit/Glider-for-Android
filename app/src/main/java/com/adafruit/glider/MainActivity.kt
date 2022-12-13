@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.view.WindowCompat
 import com.adafruit.glider.ui.GliderApp
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.GliderTheme
@@ -16,6 +17,9 @@ import com.adafruit.glider.ui.theme.GliderTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Keyboard detection
+        WindowCompat.setDecorFitsSystemWindows(window, false)
 
         /*
         try {
@@ -27,6 +31,7 @@ class MainActivity : ComponentActivity() {
         }
         */
 
+
         val appContainer = (application as GliderApplication).container
         setContent {
             GliderTheme {
@@ -36,11 +41,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
+/*
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {
     GliderTheme {
 
     }
-}
+}*/
