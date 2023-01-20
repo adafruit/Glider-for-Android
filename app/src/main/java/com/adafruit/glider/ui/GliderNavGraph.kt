@@ -80,7 +80,7 @@ fun GliderNavGraph(
             ConnectedNavigationScreen(
                 navController = navController,
                 connectionManager = appContainer.connectionManager,
-                savedBondedBlePeripherals = appContainer.savedBondedBlePeripherals,
+                bondedBlePeripherals = appContainer.bondedBlePeripherals,
                 savedSettingsWifiPeripherals = appContainer.savedSettingsWifiPeripherals,
             )
         }

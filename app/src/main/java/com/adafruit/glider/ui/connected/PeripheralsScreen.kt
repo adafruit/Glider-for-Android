@@ -39,7 +39,7 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import io.openroad.filetransfer.Config
 import io.openroad.filetransfer.Peripheral
 import io.openroad.filetransfer.ble.peripheral.BlePeripheral
-import io.openroad.filetransfer.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
 import io.openroad.filetransfer.wifi.peripheral.WifiPeripheral
 import kotlinx.coroutines.launch
 
@@ -81,6 +81,7 @@ fun PeripheralsScreen(
             viewModel.onResume()
         }
     } else if (lifeCycleState.value == Lifecycle.Event.ON_PAUSE) {
+        // Note: don't use lifeCycleState.value >= Lifecycle.Event.ON_PAUSE to stop scanning when changing tabs because Android will forbid scanning after a few changes: https://stackoverflow.com/questions/45681711/app-is-scanning-too-frequently-with-scansettings-scan-mode-opportunistic
         LaunchedEffect(lifeCycleState) {
             viewModel.onPause()
         }
@@ -89,7 +90,7 @@ fun PeripheralsScreen(
     val connectionManager = viewModel.connectionManager
     val scannedPeripherals by connectionManager.peripherals.collectAsState()
     val peripheralAddressesBeingSetup by connectionManager.peripheralAddressesBeingSetup.collectAsState()
-    val bondedBlePeripheralsData by viewModel.savedBondedBlePeripherals.peripheralsData.collectAsState()
+    val bondedBlePeripheralsData by viewModel.bondedBlePeripherals.peripheralsData.collectAsState()
     val wifiDialogSettings by viewModel.wifiDialogSettings.collectAsState()
 
     val currentFileTransferClient by connectionManager.currentFileTransferClient.collectAsState()
@@ -156,7 +157,7 @@ fun PeripheralsScreen(
         },
         onDeleteBondedPeripheral = { address ->
             connectionManager.disconnectFileTransferClient(address)
-            viewModel.savedBondedBlePeripherals.remove(address)
+            viewModel.bondedBlePeripherals.remove(address)
         },
         wifiDialogSettings = wifiDialogSettings,
         onOpenWifiDialogSettings = { wifiPeripheral ->
@@ -175,11 +176,11 @@ fun PeripheralsScreen(
 private fun PeripheralsScreenBody(
     modifier: Modifier = Modifier,
     scannedPeripherals: List<Peripheral>,
-    bondedBlePeripheralsData: List<SavedBondedBlePeripherals.Data>,
+    bondedBlePeripheralsData: List<BondedBlePeripherals.Data>,
     peripheralAddressesBeingSetup: List<String>,
     selectedPeripheral: Peripheral?,
     onSelectPeripheral: ((Peripheral) -> Unit)? = null,
-    onSelectBondedPeripheral: ((SavedBondedBlePeripherals.Data) -> Unit)? = null,
+    onSelectBondedPeripheral: ((BondedBlePeripherals.Data) -> Unit)? = null,
     onDeleteBondedPeripheral: ((String) -> Unit)? = null,
     wifiDialogSettings: Pair<String, String>? = null,
     onOpenWifiDialogSettings: ((wifiPeripheral: WifiPeripheral) -> Unit)? = null,
@@ -283,11 +284,11 @@ private fun PeripheralsScreenBody(
 @Composable
 private fun PeripheralsListByType(
     peripherals: List<Peripheral>,
-    bondedPeripherals: List<SavedBondedBlePeripherals.Data>,
+    bondedPeripherals: List<BondedBlePeripherals.Data>,
     selectedPeripheral: Peripheral?,
     peripheralAddressesBeingSetup: List<String>,
     onSelectPeripheral: ((Peripheral) -> Unit)?,
-    onSelectBondedPeripheral: ((SavedBondedBlePeripherals.Data) -> Unit)?,
+    onSelectBondedPeripheral: ((BondedBlePeripherals.Data) -> Unit)?,
     onDeleteBondedPeripheral: ((String) -> Unit)?,
     onOpenWifiDialogSettings: ((wifiPeripheral: WifiPeripheral) -> Unit)?,
 ) {
@@ -338,7 +339,7 @@ private fun PeripheralsListByType(
         //val bondedAddresses = bondedPeripherals.map { it.address }
         val blePeripherals = peripherals
             .filterIsInstance<BlePeripheral>()
-            //.filter { !bondedAddresses.contains(it.address) }       // Don't show bonded
+        //.filter { !bondedAddresses.contains(it.address) }       // Don't show bonded
         if (blePeripherals.isNotEmpty()) {
             Column(
                 Modifier.fillMaxWidth(),
@@ -368,7 +369,7 @@ private fun PeripheralsListByType(
         // Bluetooth bonded peripherals
         val blePeripheralsAddresses = blePeripherals.map { it.address }
         val bondedNotAdvertisingPeripherals = bondedPeripherals
-            .filter { !blePeripheralsAddresses.contains(it.address)}     // Don't show if advertising
+            .filter { !blePeripheralsAddresses.contains(it.address) }     // Don't show if advertising
         if (bondedNotAdvertisingPeripherals.isNotEmpty()) {
             Column(
                 Modifier.fillMaxWidth(),
@@ -425,10 +426,10 @@ private fun BlePeripheralsList(
 
 @Composable
 private fun BondedBlePeripheralsList(
-    bondedBlePeripherals: List<SavedBondedBlePeripherals.Data>,
+    bondedBlePeripherals: List<BondedBlePeripherals.Data>,
     selectedPeripheral: Peripheral?,
     peripheralAddressesBeingSetup: List<String>,
-    onSelectPeripheral: ((SavedBondedBlePeripherals.Data) -> Unit)?,
+    onSelectPeripheral: ((BondedBlePeripherals.Data) -> Unit)?,
     onStateAction: (String) -> Unit,
 ) {
     bondedBlePeripherals.forEach { data ->
@@ -549,7 +550,7 @@ private fun PeripheralButton(
                     isSelected = isSelected,
                     state = state,
                     mainColor = mainColor,
-                    )
+                )
             }
         }
 
