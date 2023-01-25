@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Eject
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -159,6 +160,9 @@ fun PeripheralsScreen(
             connectionManager.disconnectFileTransferClient(address)
             viewModel.bondedBlePeripherals.remove(address)
         },
+        onDisconnectBondedPeripheral = { address ->
+            connectionManager.disconnectFileTransferClient(address)
+        },
         wifiDialogSettings = wifiDialogSettings,
         onOpenWifiDialogSettings = { wifiPeripheral ->
             viewModel.openWifiDialogSettings(wifiPeripheral)
@@ -182,12 +186,14 @@ private fun PeripheralsScreenBody(
     onSelectPeripheral: ((Peripheral) -> Unit)? = null,
     onSelectBondedPeripheral: ((BondedBlePeripherals.Data) -> Unit)? = null,
     onDeleteBondedPeripheral: ((String) -> Unit)? = null,
+    onDisconnectBondedPeripheral: ((String) -> Unit)? = null,
     wifiDialogSettings: Pair<String, String>? = null,
     onOpenWifiDialogSettings: ((wifiPeripheral: WifiPeripheral) -> Unit)? = null,
     onWifiPeripheralPasswordChanged: ((wifiPeripheral: WifiPeripheral, newPassword: String?) -> Unit)? = null,
 ) {
     val scrollState = rememberScrollState()
     val isDeleteBondedPeripheralDialogOpen = remember { mutableStateOf<String?>(null) }
+    val isDisconnectBondedPeripheralDialogOpen = remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier
@@ -212,6 +218,9 @@ private fun PeripheralsScreenBody(
             onSelectBondedPeripheral = onSelectBondedPeripheral,
             onDeleteBondedPeripheral = { address ->
                 isDeleteBondedPeripheralDialogOpen.value = address
+            },
+            onDisconnectBondedPeripheral = { address ->
+                isDisconnectBondedPeripheralDialogOpen.value = address
             },
             onOpenWifiDialogSettings = onOpenWifiDialogSettings,
         )
@@ -279,6 +288,47 @@ private fun PeripheralsScreenBody(
             }
         )
     }
+
+    // Disconnect bonded peripheral dialog
+    isDisconnectBondedPeripheralDialogOpen.value?.let { address ->
+        val name = bondedBlePeripheralsData.firstOrNull { it.address == address }?.name
+        AlertDialog(
+            onDismissRequest = { isDisconnectBondedPeripheralDialogOpen.value = null },
+            title = { Text("Confirm disconnect") },
+            containerColor = Color.White,
+            titleContentColor = Color.Black,
+            textContentColor = Color.Black,
+            text = { Text("Disconnect from peripheral ${name ?: address}") },
+            confirmButton = {
+                OutlinedButton(
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = WarningBackground,
+                        contentColor = Color.White,
+                        disabledContentColor = Color.Gray,
+                    ),
+                    border = BorderStroke(1.dp, Color.Black),
+                    onClick = {
+                        onDisconnectBondedPeripheral?.invoke(address)
+                        isDisconnectBondedPeripheralDialogOpen.value = null
+
+                    }) {
+                    Text("Disconnect")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color.Black
+                    ),
+                    border = BorderStroke(1.dp, Color.Black),
+                    onClick = {
+                        isDisconnectBondedPeripheralDialogOpen.value = null
+                    }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -290,6 +340,7 @@ private fun PeripheralsListByType(
     onSelectPeripheral: ((Peripheral) -> Unit)?,
     onSelectBondedPeripheral: ((BondedBlePeripherals.Data) -> Unit)?,
     onDeleteBondedPeripheral: ((String) -> Unit)?,
+    onDisconnectBondedPeripheral: ((String) -> Unit)?,
     onOpenWifiDialogSettings: ((wifiPeripheral: WifiPeripheral) -> Unit)?,
 ) {
     // Empty state
@@ -387,8 +438,12 @@ private fun PeripheralsListByType(
                     selectedPeripheral = selectedPeripheral,
                     onSelectPeripheral = onSelectBondedPeripheral,
                     peripheralAddressesBeingSetup = peripheralAddressesBeingSetup,
-                    onStateAction = { address ->
-                        onDeleteBondedPeripheral?.invoke(address)
+                    onStateAction = { address, state ->
+                        if (state == PeripheralButtonState.Delete) {
+                            onDeleteBondedPeripheral?.invoke(address)
+                        } else if (state == PeripheralButtonState.Disconnect) {
+                            onDisconnectBondedPeripheral?.invoke(address)
+                        }
                     }
                 )
             }
@@ -419,7 +474,7 @@ private fun BlePeripheralsList(
             isSelected = isSelected,
             state = state,
             onSelectPeripheral = onSelectPeripheral,
-            onStateAction = {}
+            onStateAction = { _, _ -> }
         )
     }
 }
@@ -430,7 +485,7 @@ private fun BondedBlePeripheralsList(
     selectedPeripheral: Peripheral?,
     peripheralAddressesBeingSetup: List<String>,
     onSelectPeripheral: ((BondedBlePeripherals.Data) -> Unit)?,
-    onStateAction: (String) -> Unit,
+    onStateAction: (String, PeripheralButtonState) -> Unit,
 ) {
     bondedBlePeripherals.forEach { data ->
         val address = data.address
@@ -439,7 +494,9 @@ private fun BondedBlePeripheralsList(
 
         val isOperationInProgress = peripheralAddressesBeingSetup.contains(address)
         val state =
-            if (isOperationInProgress) PeripheralButtonState.Wait else PeripheralButtonState.Delete
+            if (isOperationInProgress) PeripheralButtonState.Wait else {
+                if (isSelected) PeripheralButtonState.Disconnect else PeripheralButtonState.Delete
+            }
 
         PeripheralButton(
             name = name,
@@ -478,7 +535,7 @@ private fun WifiPeripheralsList(
             isSelected = isSelected,
             state = state,
             onSelectPeripheral = onSelectPeripheral,
-            onStateAction = onStateAction
+            onStateAction = { _, _ -> onStateAction(address) }
         )
     }
 }
@@ -490,6 +547,7 @@ private sealed class PeripheralButtonState {
     object Wait : PeripheralButtonState()
     object Delete : PeripheralButtonState()
     object Settings : PeripheralButtonState()
+    object Disconnect : PeripheralButtonState()
 }
 
 @Composable
@@ -500,7 +558,7 @@ private fun PeripheralButton(
     isSelected: Boolean,
     state: PeripheralButtonState,
     onSelectPeripheral: (String) -> Unit,
-    onStateAction: (String) -> Unit,
+    onStateAction: (String, PeripheralButtonState) -> Unit,
 ) {
     val mainColor = ControlsOutline
 
@@ -555,9 +613,9 @@ private fun PeripheralButton(
         }
 
         // State button
-        if (state == PeripheralButtonState.Delete || state == PeripheralButtonState.Settings) {
+        if (state == PeripheralButtonState.Delete || state == PeripheralButtonState.Settings || state == PeripheralButtonState.Disconnect) {
             OutlinedButton(
-                onClick = { onStateAction(address) },
+                onClick = { onStateAction(address, state) },
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = mainColor
                 ),
@@ -577,7 +635,14 @@ private fun PeripheralButton(
                         Icons.Outlined.Settings,
                         contentDescription = "Settings"
                     )
+                } else if (state == PeripheralButtonState.Disconnect) {
+                    Icon(
+                        Icons.Outlined.Eject,
+                        contentDescription = "Disconnect"
+                    )
+
                 }
+
             }
         }
     }
