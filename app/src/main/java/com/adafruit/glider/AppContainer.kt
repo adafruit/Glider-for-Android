@@ -5,7 +5,7 @@ package com.adafruit.glider
  */
 
 import android.content.Context
-import io.openroad.filetransfer.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScanner
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerImpl
 import io.openroad.filetransfer.filetransfer.ConnectionManager
@@ -23,7 +23,7 @@ interface AppContainer {
     val blePeripheralScanner: BlePeripheralScanner
     val wifiPeripheralScanner: WifiPeripheralScanner
     val connectionManager: ConnectionManager
-    val savedBondedBlePeripherals: SavedBondedBlePeripherals
+    val bondedBlePeripherals: BondedBlePeripherals
     val savedSettingsWifiPeripherals: SavedSettingsWifiPeripherals
 }
 
@@ -55,7 +55,7 @@ class AppContainerImpl(private val applicationContext: Context) : AppContainer {
             wifiPeripheralScanner = wifiPeripheralScanner,
             onBlePeripheralBonded = { name, address ->
                 // Bluetooth peripheral -> Save bluetooth address when bonded to be able to reconnect later
-                savedBondedBlePeripherals.add(name, address)
+                bondedBlePeripherals.add(name, address)
             },
             onWifiPeripheralGetPasswordForHostName = { _, hostName ->
                 // Wifi peripheral -> Get saved password
@@ -64,8 +64,8 @@ class AppContainerImpl(private val applicationContext: Context) : AppContainer {
         )
     }
 
-    override val savedBondedBlePeripherals: SavedBondedBlePeripherals by lazy {
-        SavedBondedBlePeripherals(
+    override val bondedBlePeripherals: BondedBlePeripherals by lazy {
+        BondedBlePeripherals(
             context = applicationContext
         )
     }

@@ -31,7 +31,7 @@ import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.components.GliderSnackbarHost
 import com.adafruit.glider.ui.fileexplorer.FileExplorerScreen
 import com.adafruit.glider.ui.theme.GliderTheme
-import io.openroad.filetransfer.ble.peripheral.SavedBondedBlePeripherals
+import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
 import io.openroad.filetransfer.ble.utils.LogManager
 import io.openroad.filetransfer.filetransfer.ConnectionManager
@@ -47,7 +47,7 @@ val initialDestination = ConnectedNavigationDestinations.Peripherals.route     /
 fun ConnectedNavigationScreen(
     navController: NavHostController = rememberNavController(),
     connectionManager: ConnectionManager,
-    savedBondedBlePeripherals: SavedBondedBlePeripherals,
+    bondedBlePeripherals: BondedBlePeripherals,
     savedSettingsWifiPeripherals: SavedSettingsWifiPeripherals,
 ) {
     val navControllerBottomBar = rememberNavController()
@@ -99,7 +99,7 @@ fun ConnectedNavigationScreen(
         BackgroundGradientFillMaxSize {
             ConnectedNavGraph(
                 connectionManager = connectionManager,
-                savedBondedBlePeripherals = savedBondedBlePeripherals,
+                bondedBlePeripherals = bondedBlePeripherals,
                 savedSettingsWifiPeripherals = savedSettingsWifiPeripherals,
                 navController = navController,
                 navControllerBottomBar = navControllerBottomBar,
@@ -115,7 +115,7 @@ fun ConnectedNavigationScreen(
 private fun ConnectedNavGraph(
     modifier: Modifier = Modifier,
     connectionManager: ConnectionManager,
-    savedBondedBlePeripherals: SavedBondedBlePeripherals,
+    bondedBlePeripherals: BondedBlePeripherals,
     savedSettingsWifiPeripherals: SavedSettingsWifiPeripherals,
     navController: NavController,
     navControllerBottomBar: NavHostController,
@@ -134,7 +134,7 @@ private fun ConnectedNavGraph(
                 viewModel(
                     factory = PeripheralsViewModel.provideFactory(
                         connectionManager = connectionManager,
-                        savedBondedBlePeripherals = savedBondedBlePeripherals,
+                        bondedBlePeripherals = bondedBlePeripherals,
                         savedSettingsWifiPeripherals = savedSettingsWifiPeripherals
                     )
                 )
@@ -240,7 +240,7 @@ private fun ConnectedTabScreenPreview() {
         BackgroundGradientFillMaxSize {
             ConnectedNavigationScreen(
                 connectionManager = connectionManager,
-                savedBondedBlePeripherals = SavedBondedBlePeripherals(LocalContext.current),
+                bondedBlePeripherals = BondedBlePeripherals(LocalContext.current),
                 savedSettingsWifiPeripherals = SavedSettingsWifiPeripherals(LocalContext.current)
             )
         }
