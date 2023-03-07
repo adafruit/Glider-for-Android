@@ -39,7 +39,7 @@
 
         <provider
             android:name="com.adafruit.glider.provider.GliderDocumentsProvider"
-            android:authorities="com.adafruit.glider.provider.documents"
+            android:authorities="${applicationId}.provider.documents"
             android:exported="true"
             android:grantUriPermissions="true"
             android:permission="android.permission.MANAGE_DOCUMENTS">
