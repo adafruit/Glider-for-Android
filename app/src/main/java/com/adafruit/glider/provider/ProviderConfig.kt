@@ -1,5 +1,9 @@
 package com.adafruit.glider.provider
 
+/**
+ * Created by Antonio García (antonio@openroad.es)
+ */
+
 import android.provider.DocumentsContract
 
 object ProviderConfig {

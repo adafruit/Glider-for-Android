@@ -32,7 +32,7 @@ class PeripheralsViewModel(
 
     // region Lifecycle
     fun onResume() {
-        // Start scanning if we are in the scanning state
+        // Start scanning
         try {
             startScan()
         } catch (e: SecurityException) {
