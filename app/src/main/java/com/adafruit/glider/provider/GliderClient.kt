@@ -1,11 +1,15 @@
 package com.adafruit.glider.provider
 
 import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.Peripheral
+import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
 import io.openroad.filetransfer.filetransfer.ConnectionManager
 import io.openroad.filetransfer.filetransfer.DirectoryEntry
 import io.openroad.filetransfer.filetransfer.FileTransferClient
 import io.openroad.filetransfer.filetransfer.FileTransferProgressHandler
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.*
 
 class GliderClient(var address: String) {
@@ -32,10 +36,11 @@ class GliderClient(var address: String) {
     fun readFile(
         path: String,
         connectionManager: ConnectionManager,
+        bondedBlePeripherals: BondedBlePeripherals,
         progress: FileTransferProgressHandler? = null,
         completion: ((Result<ByteArray>) -> Unit)?
     ) {
-        getFileTransferClient(connectionManager) { result ->
+        getFileTransferClient(connectionManager, bondedBlePeripherals) { result ->
             result.fold(
                 onSuccess = {
                     it.readFile(scope, path, progress, completion)
@@ -51,10 +56,11 @@ class GliderClient(var address: String) {
         path: String,
         data: ByteArray,
         connectionManager: ConnectionManager,
+        bondedBlePeripherals: BondedBlePeripherals,
         progress: FileTransferProgressHandler? = null,
         completion: ((Result<Date?>) -> Unit)?
     ) {
-        getFileTransferClient(connectionManager) { result ->
+        getFileTransferClient(connectionManager, bondedBlePeripherals) { result ->
             result.fold(
                 onSuccess = {
                     it.writeFile(scope, path, data, progress, completion)
@@ -69,9 +75,10 @@ class GliderClient(var address: String) {
     fun listDirectory(
         path: String,
         connectionManager: ConnectionManager,
+        bondedBlePeripherals: BondedBlePeripherals,
         completion: ((Result<List<DirectoryEntry>?>) -> Unit)?
     ) {
-        getFileTransferClient(connectionManager) { result ->
+        getFileTransferClient(connectionManager, bondedBlePeripherals) { result ->
             result.fold(
                 onSuccess = {
                     it.listDirectory(scope, path, completion)
@@ -85,16 +92,43 @@ class GliderClient(var address: String) {
 
     private fun getFileTransferClient(
         connectionManager: ConnectionManager,
+        bondedBlePeripherals: BondedBlePeripherals,
         completion: ((Result<FileTransferClient>) -> Unit)
     ) {
-        val peripheral = connectionManager.getPeripheral(address)
-        if (peripheral == null) {
-            log.info("operation with unknown peripheral: $address")
-            
-            completion(Result.failure(UnknownPeripheralGliderClientException(address)))
-            return
-        }
 
+        connectionManager.getPeripheral(address)?.let { peripheral ->
+            getFileTransferClient(peripheral, connectionManager, completion)
+        } ?: run {
+            log.info("operation with unknown peripheral: $address")
+            log.info("current peripherals: ${connectionManager.peripherals.value.map { it.nameOrAddress }}")
+
+            // Try to scan peripherals to discover
+            scope.launch {
+                log.info("discoverPeripherals launch")
+                bondedBlePeripherals.refresh()
+                connectionManager.startScan()
+                delay(2000)
+                log.info("discoverPeripherals delay finished")
+                connectionManager.stopScan()
+
+                val peripherals = connectionManager.peripherals.value
+                log.info("current peripherals: ${peripherals.map { it.nameOrAddress }}")
+
+                connectionManager.getPeripheral(address)?.let { peripheral ->
+                    getFileTransferClient(peripheral, connectionManager, completion)
+                } ?: run {
+                    log.warning("scan didn't find peripheral: $address")
+                    completion(Result.failure(UnknownPeripheralGliderClientException(address)))
+                }
+            }
+        }
+    }
+
+    private fun getFileTransferClient(
+        peripheral: Peripheral,
+        connectionManager: ConnectionManager,
+        completion: ((Result<FileTransferClient>) -> Unit)
+    ) {
         try {
             connectionManager.setSelectedPeripheral(peripheral) { result ->
                 result.fold(

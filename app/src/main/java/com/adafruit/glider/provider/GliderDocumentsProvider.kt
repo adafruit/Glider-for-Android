@@ -24,8 +24,8 @@ import com.adafruit.glider.provider.ProviderConfig.DEFAULT_ROOT_PROJECTION
 import com.adafruit.glider.provider.ProviderConfig.ROOT_FOLDER_ID
 import com.adafruit.glider.provider.ProviderConfig.ROOT_ID
 import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.ble.peripheral.BlePeripheral
 import io.openroad.filetransfer.filetransfer.DirectoryEntry
-import io.openroad.filetransfer.filetransfer.Scanner
 import io.openroad.filetransfer.utils.upPath
 import kotlinx.coroutines.*
 import java.io.File
@@ -162,8 +162,8 @@ class GliderDocumentsProvider : DocumentsProvider() {
 
         val address = getDocumentAddress(documentId)
         val path = getDocumentPath(documentId)
-        log.info("\taddress: $address, path: $path")
         val isWrite: Boolean = mode.contains("w")
+        log.info("\taddress: $address, path: $path, isWrite: $isWrite")
 
         var readByteArray: ByteArray? = null
 
@@ -173,33 +173,30 @@ class GliderDocumentsProvider : DocumentsProvider() {
                 downloadFile(address, path)
             }
             log.info("\tread bytes: ${readByteArray.size}")
-        }
 
-        // Check if cancelled
-        if (signal?.isCanceled == true) {
-            throw CancellationException("openDocument cancelled")
+            // Check if cancelled
+            if (signal?.isCanceled == true) {
+                throw CancellationException("\topenDocument cancelled")
+            }
         }
-
 
         val file = File(context.cacheDir, documentId)
         file.parentFile?.mkdirs()
-        ///Files.createDirectories(file.parentFile.path)
-        // log.info("\tcreated folders if needed")
         file.deleteRecursively()       // Delete in case a directory with the same name exists
 
         // Byte array is not-null if we are reading the file
         readByteArray?.let {
             file.writeBytes(it)
-            log.info("\twrite file with bytes: ${readByteArray.size}")
+            log.info("\tcached file to be read is ready: ${readByteArray.size} bytes")
         } ?: run {
             // Create if not exists
             file.createNewFile()
-            log.info("\tfile created: ${file.absolutePath}")
+           // log.info("\tcached file to be written created at: ${file.absolutePath}")
         }
 
         // Check if cancelled
         if (signal?.isCanceled == true) {
-            throw CancellationException("openDocument cancelled")
+            throw CancellationException("\topenDocument cancelled")
         }
 
         val accessMode: Int = ParcelFileDescriptor.parseMode(mode)
@@ -209,13 +206,17 @@ class GliderDocumentsProvider : DocumentsProvider() {
             try {
                 ParcelFileDescriptor.open(file, accessMode, handler) {
                     // Update the file with the cloud server. The client is done writing.
-                    log.info("A file with id $documentId has been closed")
+                    log.info("\tA file with id $documentId has been closed")
                     val writeByteArray = file.readBytes()
-                    log.info("Send to peripheral ${writeByteArray.size} bytes")
+                    log.info("\tSend to peripheral ${writeByteArray.size} bytes")
 
-                    runBlocking {
+                    val exceptionHandler = CoroutineExceptionHandler { _, exception ->
+                        log.warning("uploadFile coroutineExceptionHandler got $exception")
+                    }
+                    mainScope.launch(exceptionHandler) {
                         uploadFile(address, path, writeByteArray)
                     }
+
                     log.info("\tuploaded bytes: ${writeByteArray.size}")
 
                 }
@@ -237,6 +238,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
                 path = path,
                 data = data,
                 connectionManager = container.connectionManager,
+                bondedBlePeripherals = container.bondedBlePeripherals,
                 progress = { transmittedBytes, totalBytes ->
                     log.info("openDocument uploading $transmittedBytes / $totalBytes")
                 },
@@ -254,6 +256,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
             gliderClient.readFile(
                 path = path,
                 connectionManager = container.connectionManager,
+                bondedBlePeripherals = container.bondedBlePeripherals,
                 progress = { transmittedBytes, totalBytes ->
                     log.info("openDocument downloading $transmittedBytes / $totalBytes")
                 },
@@ -314,9 +317,22 @@ class GliderDocumentsProvider : DocumentsProvider() {
         )
         val documents = cache.get(notifyUri)
 
-        return if (documents == null) {
-            log.info("List directory from peripheral")
-            createLoadingCursor(projection).apply {
+        if (documents == null) {
+            // Display error if needed
+            listFromPeripheralError?.let {
+                // Expire error after some time
+                if (Date().time - it.updatedTime.time > 5000) {
+                    listFromPeripheralError = null
+                }
+                // Show error if the saved error is for the current directory
+                else if (parentDocumentId == it.parentDocumentId) {
+                    return createErrorCursor(projection, "Error: ${it.exception.message}")
+                }
+            }
+
+            // Show loading and List directory
+            val name = getDocumentName(parentDocumentId)
+            return createLoadingCursor(projection, "Listing $name...").apply {
                 setNotificationUri(context?.contentResolver, notifyUri)
             }.also {
                 listFromPeripheral(parentDocumentId, notifyUri)
@@ -325,7 +341,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
             // Documents are found in cache, return the documents by adding them to the cursor.
             log.info("List directory is cached")
 
-            MatrixCursor(projection ?: DEFAULT_DOCUMENT_PROJECTION).also { cursor ->
+            return MatrixCursor(projection ?: DEFAULT_DOCUMENT_PROJECTION).also { cursor ->
                 documents.forEach {
 
                     log.info(
@@ -351,7 +367,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
             BuildConfig.DOCUMENTS_AUTHORITY,
             parentDocumentId
         )
-        val loadingCursor = createLoadingCursor(projection).apply {
+        val loadingCursor = createLoadingCursor(projection, "Discovering peripherals...").apply {
             setNotificationUri(context?.contentResolver, notifyUri)
         }
 
@@ -362,7 +378,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
 
         // Check if it a recent scan is available or scan again
         val isScanningStale =
-            System.currentTimeMillis() - discoveredPeripherals.lastUpdateMillis > 12000
+            System.currentTimeMillis() - discoveredPeripherals.lastUpdateMillis > 15000
         if (isScanningStale || discoveredPeripherals.isEmpty) {
 
             log.info("Root folder -> scan peripherals")
@@ -373,12 +389,13 @@ class GliderDocumentsProvider : DocumentsProvider() {
             log.info("Root folder -> show discovered peripherals: ${discoveredPeripherals.bondedBlePeripherals.size + discoveredPeripherals.peripherals.size}")
             val documents = mutableListOf<DocumentMetaData>()
 
-            discoveredPeripherals.bondedBlePeripherals.forEach { data ->
+            // Add discovered peripherals
+            discoveredPeripherals.peripherals.forEach { peripheral ->
                 documents.add(
                     DocumentMetaData(
-                        id = data.address,
+                        id = peripheral.address,
                         mimeType = DocumentsContract.Document.MIME_TYPE_DIR,
-                        displayName = data.name ?: data.address,
+                        displayName = peripheral.nameOrAddress,
                         lastModified = discoveredPeripherals.lastUpdateMillis,
                         flags = 0,
                         size = 0,
@@ -386,12 +403,20 @@ class GliderDocumentsProvider : DocumentsProvider() {
                 )
             }
 
-            discoveredPeripherals.peripherals.forEach { peripheral ->
+            // Add bonded that but only if they are have not been already added because they were discovered
+            val blePeripherals = discoveredPeripherals.peripherals
+                .filterIsInstance<BlePeripheral>()
+            val blePeripheralsAddresses = blePeripherals.map { it.address }
+            val bondedNotAdvertisingPeripherals = discoveredPeripherals.bondedBlePeripherals
+                .filter { !blePeripheralsAddresses.contains(it.address) }
+
+            bondedNotAdvertisingPeripherals.forEach { data ->
+
                 documents.add(
                     DocumentMetaData(
-                        id = peripheral.address,
+                        id = data.address,
                         mimeType = DocumentsContract.Document.MIME_TYPE_DIR,
-                        displayName = peripheral.nameOrAddress,
+                        displayName = data.name ?: data.address,
                         lastModified = discoveredPeripherals.lastUpdateMillis,
                         flags = 0,
                         size = 0,
@@ -412,6 +437,15 @@ class GliderDocumentsProvider : DocumentsProvider() {
     private
     val listFromPeripheralJobs: ConcurrentMap<String, Job> = ConcurrentHashMap()
 
+    private data class ListFromPeripheralError(
+        val parentDocumentId: String,
+        val exception: GliderClientException,
+        val updatedTime: Date = Date()
+    )
+
+    private var listFromPeripheralError: ListFromPeripheralError? =
+        null        // parentDocumentId and exception found. Used to show an error to the user
+
     private fun listFromPeripheral(
         parentDocumentId: String,
         notifyUri: Uri
@@ -420,6 +454,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
             log.info("listFromPeripheral. Skip, already running")
             return
         }
+
 
         listFromPeripheralJobs[parentDocumentId] = mainScope.launch {
             log.info("listFromPeripheral: $parentDocumentId, notifyUri: $notifyUri")
@@ -434,6 +469,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
             gliderClient.listDirectory(
                 path = folderPath,
                 connectionManager = container.connectionManager,
+                bondedBlePeripherals = container.bondedBlePeripherals,
             ) { result ->
 
                 result.fold(
@@ -452,7 +488,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
                                     if (entry.isDirectory) 0 else (entry.type as DirectoryEntry.EntryType.File).size.toLong()
 
                                 log.info(
-                                    "\t${entry.name}, $mimeType, size: $size, date: ${
+                                    "\t$route ${entry.name}, $mimeType, size: $size, date: ${
                                         entry.modificationDate?.let {
                                             SimpleDateFormat(
                                                 "dd/MM/yyyy", Locale.ENGLISH
@@ -479,11 +515,20 @@ class GliderDocumentsProvider : DocumentsProvider() {
 
                         } ?: run {
                             log.info("listDirectory: nonexistent directory")
+                            listFromPeripheralError = ListFromPeripheralError(
+                                parentDocumentId,
+                                GliderClientException("Non-existent directory", null)
+                            )
+                            notifyChange(notifyUri)
                         }
                     },
                     onFailure = { exception ->
                         log.warning("listDirectory $parentDocumentId error $exception")
-                        throw GliderClientException("Invalid folder", exception)
+                        listFromPeripheralError = ListFromPeripheralError(
+                            parentDocumentId,
+                            GliderClientException("Invalid folder", null)
+                        )
+                        notifyChange(notifyUri)
                     }
                 )
 
@@ -516,22 +561,16 @@ class GliderDocumentsProvider : DocumentsProvider() {
             startScan()
             delay(2000)
             log.info("discoverPeripherals delay finished")
+            stopScan()
 
             // Skip if it is no longer active
             if (isActive) {
-                val scanningState =
-                    container.connectionManager.scanningState.value
-                //log.info("scanning state: $scanningState")
-                stopScan()
+                val peripherals = container.connectionManager.peripherals.value
 
                 // Update discovered peripherals
                 discoveredPeripherals = DiscoveredPeripherals(
                     bondedBlePeripherals = container.bondedBlePeripherals.peripheralsData.value,
-                    peripherals = if (scanningState is Scanner.ScanningState.Scanning) {
-                        scanningState.peripherals
-                    } else {
-                        emptyList()
-                    },
+                    peripherals = peripherals,
                     lastUpdateMillis = System.currentTimeMillis()
                 )
 
