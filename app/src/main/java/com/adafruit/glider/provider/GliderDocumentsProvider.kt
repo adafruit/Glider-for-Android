@@ -4,6 +4,8 @@ package com.adafruit.glider.provider
  * Created by Antonio García (antonio@openroad.es)
  */
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ContentResolver.NOTIFY_UPDATE
 import android.database.Cursor
 import android.database.MatrixCursor
@@ -15,6 +17,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
+import androidx.annotation.RequiresPermission
 import com.adafruit.glider.AppContainer
 import com.adafruit.glider.AppContainerImpl
 import com.adafruit.glider.BuildConfig
@@ -24,14 +27,12 @@ import com.adafruit.glider.provider.ProviderConfig.DEFAULT_ROOT_PROJECTION
 import com.adafruit.glider.provider.ProviderConfig.ROOT_FOLDER_ID
 import com.adafruit.glider.provider.ProviderConfig.ROOT_ID
 import com.adafruit.glider.utils.LogUtils
-import io.openroad.filetransfer.ble.peripheral.BlePeripheral
 import io.openroad.filetransfer.filetransfer.DirectoryEntry
 import io.openroad.filetransfer.utils.upPath
 import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
@@ -68,12 +69,15 @@ class GliderDocumentsProvider : DocumentsProvider() {
 
         val cursor: MatrixCursor = if (parentDocumentId == ROOT_FOLDER_ID) {
             queryRootDocuments(parentDocumentId, projection, sortOrder)
-
         } else {
-            queryPeripheralDocuments(parentDocumentId, projection, sortOrder)
+            try {
+                queryPeripheralDocuments(parentDocumentId, projection, sortOrder)
+            } catch (e: SecurityException) {
+                createErrorCursor(projection, "Bluetooth permissions needed")
+            }
         }
 
-        log.info("queryChildDocuments cursor: ${if (cursor.isLoading()) "loading" else cursor.count}")
+        //log.info("queryChildDocuments cursor: ${if (cursor.isLoading()) "loading" else cursor.count}")
         return cursor
     }
 
@@ -170,7 +174,12 @@ class GliderDocumentsProvider : DocumentsProvider() {
         // Download file for reading operations
         if (!isWrite) {
             readByteArray = runBlocking {
-                downloadFile(address, path)
+                try {
+                    downloadFile(address, path)
+                } catch (e: SecurityException) {
+                    log.warning("Error downloading file: $e")
+                    throw e
+                }
             }
             log.info("\tread bytes: ${readByteArray.size}")
 
@@ -191,7 +200,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
         } ?: run {
             // Create if not exists
             file.createNewFile()
-           // log.info("\tcached file to be written created at: ${file.absolutePath}")
+            // log.info("\tcached file to be written created at: ${file.absolutePath}")
         }
 
         // Check if cancelled
@@ -214,22 +223,27 @@ class GliderDocumentsProvider : DocumentsProvider() {
                         log.warning("uploadFile coroutineExceptionHandler got $exception")
                     }
                     mainScope.launch(exceptionHandler) {
-                        uploadFile(address, path, writeByteArray)
+                        try {
+                            uploadFile(address, path, writeByteArray)
+                        } catch (e: SecurityException) {
+                            log.warning("Error uploading file: $e")
+                            throw e
+                        }
                     }
 
                     log.info("\tuploaded bytes: ${writeByteArray.size}")
 
                 }
             } catch (e: IOException) {
-                throw FileNotFoundException(
-                    "Failed to open document with id $documentId and mode $mode"
-                )
+                throw FileNotFoundException("Failed to open document with id $documentId and mode $mode")
             }
         } else {
             ParcelFileDescriptor.open(file, accessMode)
         }
     }
 
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private suspend fun uploadFile(address: String, path: String, data: ByteArray): Date? =
         suspendCoroutine { continuation ->
 
@@ -248,7 +262,8 @@ class GliderDocumentsProvider : DocumentsProvider() {
             )
         }
 
-
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private suspend fun downloadFile(address: String, path: String): ByteArray =
         suspendCoroutine { continuation ->
 
@@ -301,6 +316,8 @@ class GliderDocumentsProvider : DocumentsProvider() {
     // endregion
 
     // region Utils
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private fun queryPeripheralDocuments(
         parentDocumentId: String?,
         projection: Array<out String>?,
@@ -344,13 +361,14 @@ class GliderDocumentsProvider : DocumentsProvider() {
             return MatrixCursor(projection ?: DEFAULT_DOCUMENT_PROJECTION).also { cursor ->
                 documents.forEach {
 
+                    /*
                     log.info(
                         "\t${it.id}, ${it.displayName}, ${it.mimeType}, size: ${it.size}, date: ${
                             SimpleDateFormat(
                                 "dd/MM/yyyy", Locale.ENGLISH
                             ).format(Date(it.lastModified))
                         }"
-                    )
+                    )*/
                     it.addToRow(cursor.newRow())
                 }
             }
@@ -386,7 +404,6 @@ class GliderDocumentsProvider : DocumentsProvider() {
                 discoverPeripherals(notifyUri)
             }
         } else {
-            log.info("Root folder -> show discovered peripherals: ${discoveredPeripherals.bondedBlePeripherals.size + discoveredPeripherals.peripherals.size}")
             val documents = mutableListOf<DocumentMetaData>()
 
             // Add discovered peripherals
@@ -404,14 +421,10 @@ class GliderDocumentsProvider : DocumentsProvider() {
             }
 
             // Add bonded that but only if they are have not been already added because they were discovered
-            val blePeripherals = discoveredPeripherals.peripherals
-                .filterIsInstance<BlePeripheral>()
-            val blePeripheralsAddresses = blePeripherals.map { it.address }
-            val bondedNotAdvertisingPeripherals = discoveredPeripherals.bondedBlePeripherals
-                .filter { !blePeripheralsAddresses.contains(it.address) }
+            val bondedNotAdvertisingPeripherals =
+                getBondedPeripheralsNotDiscovered(discoveredPeripherals)
 
             bondedNotAdvertisingPeripherals.forEach { data ->
-
                 documents.add(
                     DocumentMetaData(
                         id = data.address,
@@ -423,6 +436,8 @@ class GliderDocumentsProvider : DocumentsProvider() {
                     )
                 )
             }
+
+            log.info("Root folder -> show discovered peripherals: ${documents.size}")
 
             return MatrixCursor(
                 projection ?: DEFAULT_DOCUMENT_PROJECTION
@@ -446,6 +461,8 @@ class GliderDocumentsProvider : DocumentsProvider() {
     private var listFromPeripheralError: ListFromPeripheralError? =
         null        // parentDocumentId and exception found. Used to show an error to the user
 
+    @SuppressLint("InlinedApi")
+    @RequiresPermission(allOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT])
     private fun listFromPeripheral(
         parentDocumentId: String,
         notifyUri: Uri
@@ -454,7 +471,6 @@ class GliderDocumentsProvider : DocumentsProvider() {
             log.info("listFromPeripheral. Skip, already running")
             return
         }
-
 
         listFromPeripheralJobs[parentDocumentId] = mainScope.launch {
             log.info("listFromPeripheral: $parentDocumentId, notifyUri: $notifyUri")
@@ -487,6 +503,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
                                 val size =
                                     if (entry.isDirectory) 0 else (entry.type as DirectoryEntry.EntryType.File).size.toLong()
 
+                                /*
                                 log.info(
                                     "\t$route ${entry.name}, $mimeType, size: $size, date: ${
                                         entry.modificationDate?.let {
@@ -495,7 +512,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
                                             ).format(it)
                                         }
                                     }."
-                                )
+                                )*/
 
                                 documents.add(
                                     DocumentMetaData(
@@ -526,7 +543,7 @@ class GliderDocumentsProvider : DocumentsProvider() {
                         log.warning("listDirectory $parentDocumentId error $exception")
                         listFromPeripheralError = ListFromPeripheralError(
                             parentDocumentId,
-                            GliderClientException("Invalid folder", null)
+                            GliderClientException(exception.message, null)
                         )
                         notifyChange(notifyUri)
                     }
@@ -565,16 +582,19 @@ class GliderDocumentsProvider : DocumentsProvider() {
 
             // Skip if it is no longer active
             if (isActive) {
-                val peripherals = container.connectionManager.peripherals.value
-
                 // Update discovered peripherals
-                discoveredPeripherals = DiscoveredPeripherals(
-                    bondedBlePeripherals = container.bondedBlePeripherals.peripheralsData.value,
-                    peripherals = peripherals,
-                    lastUpdateMillis = System.currentTimeMillis()
+                discoveredPeripherals = createDiscoveredPeripherals(
+                    container.connectionManager,
+                    container.bondedBlePeripherals
                 )
 
-                log.info("peripherals discovered: ${discoveredPeripherals.bondedBlePeripherals.size + discoveredPeripherals.peripherals.size}")
+                log.info(
+                    "peripherals discovered: ${
+                        getBondedPeripheralsNotDiscovered(
+                            discoveredPeripherals
+                        ).size
+                    }"
+                )
                 log.info("discoverPeripherals finished, notifyChange $notifyUri")
                 notifyChange(notifyUri)
             } else {

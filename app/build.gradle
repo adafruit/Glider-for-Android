@@ -11,8 +11,8 @@ android {
         applicationId "com.adafruit.glider"
         minSdk 27
         targetSdk 33
-        versionCode 12
-        versionName "1.1.0"
+        versionCode 13
+        versionName "2.0.0"
 
         def documentsAuthorityValue = applicationId + ".provider.documents"
         manifestPlaceholders = [documentsAuthority: documentsAuthorityValue]
