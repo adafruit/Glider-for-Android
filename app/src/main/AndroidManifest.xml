@@ -36,6 +36,17 @@
                 android:name="io.openroad.filetransfer.ble.utils.BleInitializer"
                 android:value="androidx.startup" />
         </provider>
+
+        <provider
+            android:name="com.adafruit.glider.provider.GliderDocumentsProvider"
+            android:authorities="${documentsAuthority}"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
     </application>
 
 </manifest>

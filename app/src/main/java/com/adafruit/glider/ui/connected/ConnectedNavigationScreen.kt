@@ -38,7 +38,6 @@ import io.openroad.filetransfer.filetransfer.ConnectionManager
 import io.openroad.filetransfer.wifi.peripheral.SavedSettingsWifiPeripherals
 import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
 
-
 val initialDestination = ConnectedNavigationDestinations.Peripherals.route     // Debug
 //val initialDestination = ConnectedNavigationDestinations.FileExplorer.route
 
