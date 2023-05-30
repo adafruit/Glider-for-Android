@@ -6,6 +6,7 @@ package com.adafruit.glider
 
 import android.content.Context
 import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
+import io.openroad.filetransfer.ble.peripheral.BondedBlePeripheralsImpl
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScanner
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerImpl
 import io.openroad.filetransfer.filetransfer.ConnectionManager
@@ -65,7 +66,7 @@ class AppContainerImpl(private val applicationContext: Context) : AppContainer {
     }
 
     override val bondedBlePeripherals: BondedBlePeripherals by lazy {
-        BondedBlePeripherals(
+        BondedBlePeripheralsImpl(
             context = applicationContext
         )
     }

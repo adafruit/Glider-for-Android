@@ -41,7 +41,7 @@ fun FileEditScaffoldingScreen(
     val title = filenameFromPath(path)
 
     Scaffold(
-        contentWindowInsets = if (WindowInsets.isImeVisible) WindowInsets.ime else  WindowInsets.navigationBars,
+        contentWindowInsets = if (WindowInsets.isImeVisible) WindowInsets.ime else WindowInsets.navigationBars,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(title) },
@@ -124,9 +124,9 @@ fun FileEditScreen(
                     .fillMaxSize(),
                 label = null,
                 shape = RoundedCornerShape(8.dp),
-                colors = TextFieldDefaults.textFieldColors(
-                    containerColor = Color.White,
-                    textColor = Color.Black,
+                colors = TextFieldDefaults.colors(
+                    unfocusedContainerColor = Color.White,
+                    unfocusedTextColor = Color.Black,
                     cursorColor = Color.Black,
                     focusedIndicatorColor = Color.Transparent, //hide the indicator
                     unfocusedIndicatorColor = Color.Transparent,
