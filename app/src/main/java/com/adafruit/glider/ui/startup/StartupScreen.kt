@@ -22,40 +22,7 @@ import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.theme.GliderTheme
 
 @Composable
-fun StartupScreen(
-    // isInitialPermissionsCheckInProgress: Boolean,
-    //viewModel: StartupViewModel = viewModel(),
-    onFinished: () -> Unit
-) {
-
-    val isRestoringConnection = false
-    /*
-    // UI State
-    val uiState by viewModel.uiState.collectAsState()
-    val isRestoringConnection = uiState == StartupViewModel.StartupUiState.Reconnecting
-
-    // Navigation
-    when (uiState) {
-        is StartupViewModel.StartupUiState.AwaitingPermissionsCheck -> {
-            if (!isInitialPermissionsCheckInProgress) {
-                LaunchedEffect(uiState) {
-                    viewModel.reconnect()
-                }
-            }
-        }
-        /*
-        is StartupViewModel.StartupUiState.Reconnecting -> {
-            LaunchedEffect(uiState) {
-                viewModel.reconnect()
-            }
-        }*/
-        is StartupViewModel.StartupUiState.Finished -> {
-            LaunchedEffect(uiState) {
-                onFinished()
-            }
-        }
-        else -> {}
-    }*/
+fun StartupScreen() {
 
     // UI
     BackgroundGradientFillMaxSize(contentAlignment = Alignment.Center) {
@@ -68,57 +35,23 @@ fun StartupScreen(
                 contentDescription = "Glider logo",
             )
 
+            /*
             Text(
                 "Restoring Connection...",
                 Modifier.alpha(if (isRestoringConnection) 1.0f else 0.0f)
-            )
+            )*/
 
             CircularProgressIndicator(color = Color.White)
-            //BluetoothState()
         }
     }
 }
-
-/*
-@Composable
-private fun BluetoothState() {
-    val bleState = if (LocalInspectionMode.current) {       // In preview mode
-        BleState.BleNotAvailable
-    } else {
-        val appContainer =
-            (LocalContext.current.applicationContext as GliderApplication).appContainer
-        val bleStateViewModel: BleStateViewModel = viewModel(
-            factory = BleStateViewModelFactory(appContainer.bleStateRepository)
-        )
-        val bleStateState = bleStateViewModel.bleBleState.collectAsState()
-        bleStateState.value
-    }
-
-    BluetoothStateContent(bleState = bleState)
-}
-
-@Composable
-private fun BluetoothStateContent(bleState: BleState) {
-    val text: String = when (bleState) {
-        BleState.Unknown -> "unknown"
-        BleState.BluetoothNotAvailable -> "bluetooth not available"
-        BleState.BleNotAvailable -> "ble not available"
-        BleState.Disabled -> "disabled"
-        BleState.Enabled -> "enabled"
-        BleState.TurningOn -> "turning on"
-        BleState.TurningOff -> "turning off"
-    }
-
-    Text("State: $text")
-}
-*/
 
 // region Previews
 @Preview(showSystemUi = true)
 @Composable
 private fun StartupPreview() {
     GliderTheme {
-        StartupScreen(/*true*/) {}
+        StartupScreen()
     }
 }
 //endregion
