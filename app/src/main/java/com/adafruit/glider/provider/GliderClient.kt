@@ -3,7 +3,7 @@ package com.adafruit.glider.provider
 import android.Manifest
 import android.annotation.SuppressLint
 import androidx.annotation.RequiresPermission
-import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.ble.utils.LogUtils
 import io.openroad.filetransfer.Peripheral
 import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
 import io.openroad.filetransfer.filetransfer.ConnectionManager

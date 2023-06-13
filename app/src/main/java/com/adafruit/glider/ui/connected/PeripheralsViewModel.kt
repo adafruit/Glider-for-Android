@@ -6,7 +6,7 @@ import androidx.annotation.RequiresPermission
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.ble.utils.LogUtils
 import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
 import io.openroad.filetransfer.filetransfer.ConnectionManager
 import io.openroad.filetransfer.filetransfer.WifiFileTransferPeripheral

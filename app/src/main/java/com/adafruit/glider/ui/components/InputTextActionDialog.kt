@@ -28,7 +28,7 @@ fun InputTextActionDialog(
     alertText: String,
     alertMessage: String,
     placeholderText: String,
-    currentText: String= "",
+    currentText: String = "",
     actionText: String,
     onAction: (String?) -> Unit,            // returns the text or null if cancel was pressed
 ) {
@@ -46,7 +46,9 @@ fun InputTextActionDialog(
                 TextField(
                     colors = TextFieldDefaults.colors(
                         unfocusedTextColor = Color.Black,
+                        focusedTextColor = Color.Black,
                         unfocusedPlaceholderColor = Color.Gray,
+                        focusedPlaceholderColor = Color.Gray,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         cursorColor = Color.Black,

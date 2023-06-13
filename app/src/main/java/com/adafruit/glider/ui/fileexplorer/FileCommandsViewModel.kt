@@ -6,7 +6,7 @@ package com.adafruit.glider.ui.fileexplorer
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.ble.utils.LogUtils
 import io.openroad.filetransfer.filetransfer.DirectoryEntry
 import io.openroad.filetransfer.filetransfer.FileTransferClient
 import io.openroad.filetransfer.filetransfer.TransmissionLog
@@ -125,10 +125,10 @@ open class FileCommandsViewModel : ViewModel() {
         }
     }
 
-    fun makeFile(filename: String, fileTransferClient: FileTransferClient) {
+    fun makeFile(filename: String, data: ByteArray = byteArrayOf(), fileTransferClient: FileTransferClient) {
         writeFile(
             filename = filename,
-            data = byteArrayOf(),
+            data = data,
             fileTransferClient = fileTransferClient
         ) { result ->
             if (result.isSuccess) {
