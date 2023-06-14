@@ -4,16 +4,40 @@ package com.adafruit.glider.ui.fileexplorer
  * Created by Antonio García (antonio@openroad.es)
  */
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement.Absolute.spacedBy
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.NoteAdd
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,10 +49,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.adafruit.glider.ui.components.BackgroundGradient
 import com.adafruit.glider.ui.components.BackgroundGradientFillMaxSize
 import com.adafruit.glider.ui.components.InputTextActionDialog
 import com.adafruit.glider.ui.theme.ControlsOutline
 import com.adafruit.glider.ui.theme.GliderTheme
+import com.adafruit.glider.utils.DocumentProviderUtils
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
 import io.openroad.filetransfer.filetransfer.ConnectionManager
 import io.openroad.filetransfer.wifi.scanner.WifiPeripheralScannerFake
@@ -47,7 +73,9 @@ fun FileExplorerScreen(
     // Empty state
     if (fileTransferClient == null) {
         Column(
-            modifier = modifier.padding(40.dp).fillMaxWidth(),
+            modifier = modifier
+                .padding(40.dp)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = spacedBy(12.dp),
         ) {
@@ -165,35 +193,44 @@ fun FileExplorerBody(
                     )
 
                     // Action Buttons
-                    InputTextActionButton(
+                    val context = LocalContext.current
+                    ActionButtons(
                         mainColor = outlineColor,
-                        buttonIcon = Icons.Outlined.CreateNewFolder,
-                        alertText = "New Directory",
-                        alertMessage = "Enter name for the new directory",
-                        placeholderText = "Directory name",
-                        actionText = "Create",
                         enabled = !isReconnecting,
-                    ) { inputText ->
-                        val newDirectoryPath = viewModel.path.value + inputText
-                        fileTransferClient?.let { fileTransferClient ->
-                            viewModel.makeDirectory(newDirectoryPath, fileTransferClient)
-                        }
-                    }
+                        onMakeDirectory = { inputText ->
+                            val newDirectoryPath = viewModel.path.value + inputText
+                            fileTransferClient?.let { fileTransferClient ->
+                                viewModel.makeDirectory(
+                                    newDirectoryPath,
+                                    fileTransferClient
+                                )
+                            }
+                        },
+                        onMakeFile = { inputText ->
+                            val newFilePath = viewModel.path.value + inputText
+                            fileTransferClient?.let { fileTransferClient ->
+                                viewModel.makeFile(
+                                    newFilePath,
+                                    fileTransferClient = fileTransferClient
+                                )
+                            }
+                        },
+                        onUploadFile = { uri ->
+                            DocumentProviderUtils.getFileName(context, uri)?.let { filename ->
+                                val newFilePath = viewModel.path.value + filename
+                                fileTransferClient?.let { fileTransferClient ->
+                                    val item = context.contentResolver.openInputStream(uri)
+                                    val data = item?.readBytes()
+                                    item?.close()
 
-                    InputTextActionButton(
-                        mainColor = outlineColor,
-                        buttonIcon = Icons.Outlined.NoteAdd,
-                        alertText = "New File",
-                        alertMessage = "Enter name for the new file",
-                        placeholderText = "Filename",
-                        actionText = "Create",
-                        enabled = !isReconnecting,
-                    ) { inputText ->
-                        val newFilePath = viewModel.path.value + inputText
-                        fileTransferClient?.let { fileTransferClient ->
-                            viewModel.makeFile(newFilePath, fileTransferClient)
-                        }
-                    }
+                                    if (data != null) {
+                                        viewModel.makeFile(newFilePath, data, fileTransferClient)
+                                    }
+                                }
+                            }
+                        },
+                    )
+
                 }
             }
         }
@@ -240,6 +277,63 @@ fun FileExplorerBody(
 }
 
 @Composable
+private fun ActionButtons(
+    mainColor: Color,
+    enabled: Boolean,
+    onMakeDirectory: (String) -> Unit,
+    onMakeFile: (String) -> Unit,
+    onUploadFile: (Uri) -> Unit,
+) {
+    // New directory button
+    InputTextActionButton(
+        mainColor = mainColor,
+        buttonIcon = Icons.Outlined.CreateNewFolder,
+        alertText = "New Directory",
+        alertMessage = "Enter name for the new directory",
+        placeholderText = "Directory name",
+        actionText = "Create",
+        enabled = enabled,
+        onNewInputText = onMakeDirectory,
+    )
+
+    // New file button
+    InputTextActionButton(
+        mainColor = mainColor,
+        buttonIcon = Icons.Outlined.NoteAdd,
+        alertText = "New File",
+        alertMessage = "Enter name for the new file",
+        placeholderText = "Filename",
+        actionText = "Create",
+        enabled = enabled,
+        onNewInputText = onMakeFile,
+    )
+
+    // Upload file button
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            onUploadFile(uri)
+        }
+    }
+    OutlinedButton(
+        onClick = {
+            launcher.launch("*/*")
+        },
+        enabled = enabled,
+        colors = ButtonDefaults.textButtonColors(
+            containerColor = Color.Transparent,
+            contentColor = mainColor,
+            disabledContentColor = Color.Gray,
+        ),
+        border = BorderStroke(1.dp, mainColor),
+    ) {
+        Icon(
+            Icons.Outlined.UploadFile, contentDescription = "Upload File"
+        )
+    }
+}
+
+
+@Composable
 private fun InputTextActionButton(
     mainColor: Color,
     buttonIcon: ImageVector,
@@ -252,7 +346,7 @@ private fun InputTextActionButton(
 ) {
     val isDialogOpen = remember { mutableStateOf(false) }
 
-    // New Directory
+    // Button
     OutlinedButton(
         onClick = {
             isDialogOpen.value = true
@@ -266,11 +360,11 @@ private fun InputTextActionButton(
         border = BorderStroke(1.dp, mainColor),
     ) {
         Icon(
-            buttonIcon, contentDescription = "New Directory"
+            buttonIcon, contentDescription = alertText
         )
     }
 
-    // New Directory Alert
+    // Alert
     if (isDialogOpen.value) {
         InputTextActionDialog(
             alertText = alertText,
@@ -286,9 +380,30 @@ private fun InputTextActionButton(
     }
 }
 
-
 // region Previews
-@Preview(showSystemUi = true)
+
+@Preview
+@Composable
+private fun FileExplorerActionButtonsPreview() {
+    GliderTheme {
+        BackgroundGradient {
+            Row(
+                Modifier.padding(8.dp),
+                horizontalArrangement = spacedBy(8.dp)
+            ) {
+                ActionButtons(
+                    mainColor = ControlsOutline,
+                    enabled = true,
+                    onMakeDirectory = {},
+                    onMakeFile = {},
+                    onUploadFile = {},
+                )
+            }
+        }
+    }
+}
+
+@Preview
 @Composable
 private fun FileExplorerScreenPreview() {
     GliderTheme {
@@ -308,3 +423,4 @@ private fun FileExplorerScreenPreview() {
     }
 }
 
+// endregion

@@ -26,7 +26,7 @@ import com.adafruit.glider.provider.ProviderConfig.DEFAULT_DOCUMENT_PROJECTION
 import com.adafruit.glider.provider.ProviderConfig.DEFAULT_ROOT_PROJECTION
 import com.adafruit.glider.provider.ProviderConfig.ROOT_FOLDER_ID
 import com.adafruit.glider.provider.ProviderConfig.ROOT_ID
-import com.adafruit.glider.utils.LogUtils
+import io.openroad.filetransfer.ble.utils.LogUtils
 import io.openroad.filetransfer.filetransfer.DirectoryEntry
 import io.openroad.filetransfer.utils.upPath
 import kotlinx.coroutines.*

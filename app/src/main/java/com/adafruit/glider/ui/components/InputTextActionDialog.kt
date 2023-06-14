@@ -7,20 +7,28 @@ package com.adafruit.glider.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.adafruit.glider.ui.theme.GliderTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InputTextActionDialog(
     alertText: String,
     alertMessage: String,
     placeholderText: String,
-    currentText: String= "",
+    currentText: String = "",
     actionText: String,
     onAction: (String?) -> Unit,            // returns the text or null if cancel was pressed
 ) {
@@ -36,9 +44,11 @@ fun InputTextActionDialog(
             Column(verticalArrangement = Arrangement.Absolute.spacedBy(16.dp)) {
                 Text(alertMessage)
                 TextField(
-                    colors = TextFieldDefaults.textFieldColors(
-                        textColor = Color.Black,
-                        placeholderColor = Color.Gray,
+                    colors = TextFieldDefaults.colors(
+                        unfocusedTextColor = Color.Black,
+                        focusedTextColor = Color.Black,
+                        unfocusedPlaceholderColor = Color.Gray,
+                        focusedPlaceholderColor = Color.Gray,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         cursorColor = Color.Black,

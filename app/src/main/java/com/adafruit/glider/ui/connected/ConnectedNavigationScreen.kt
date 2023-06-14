@@ -32,6 +32,7 @@ import com.adafruit.glider.ui.components.GliderSnackbarHost
 import com.adafruit.glider.ui.fileexplorer.FileExplorerScreen
 import com.adafruit.glider.ui.theme.GliderTheme
 import io.openroad.filetransfer.ble.peripheral.BondedBlePeripherals
+import io.openroad.filetransfer.ble.peripheral.BondedBlePeripheralsFake
 import io.openroad.filetransfer.ble.scanner.BlePeripheralScannerFake
 import io.openroad.filetransfer.ble.utils.LogManager
 import io.openroad.filetransfer.filetransfer.ConnectionManager
@@ -239,7 +240,7 @@ private fun ConnectedTabScreenPreview() {
         BackgroundGradientFillMaxSize {
             ConnectedNavigationScreen(
                 connectionManager = connectionManager,
-                bondedBlePeripherals = BondedBlePeripherals(LocalContext.current),
+                bondedBlePeripherals = BondedBlePeripheralsFake(),
                 savedSettingsWifiPeripherals = SavedSettingsWifiPeripherals(LocalContext.current)
             )
         }
